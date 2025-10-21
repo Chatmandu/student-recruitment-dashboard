@@ -22,19 +22,19 @@ exports.handler = async (event) => {
   }
 
   const baseUrl = 'https://api.tickettailor.com/v1';
-  const authHeader = `Basic ${Buffer.from(apiKey + ':').toString('base64')}`;
 
   try {
     const { action, startDate, endDate } = JSON.parse(event.body || '{}');
 
     switch (action) {
       case 'getEvents':
-        // Set date to today at midnight to only get future events
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
         const eventsResponse = await axios.get(`${baseUrl}/events`, {
-          headers: { 'Authorization': authHeader },
+          headers: { 
+            'Authorization': `Bearer ${apiKey}`
+          },
           params: { 
             status: 'published',
             start: startDate || today.toISOString(),
@@ -44,13 +44,11 @@ exports.handler = async (event) => {
 
         let events = eventsResponse.data.data || [];
         
-        // CRITICAL: Filter out events that are in the past
-        // Ticket Tailor sometimes returns old events even with the start parameter
         const now = Date.now();
         events = events.filter(evt => {
-          if (!evt.start) return true; // Keep if no date
+          if (!evt.start) return true;
           const eventDate = new Date(evt.start.date || evt.start).getTime();
-          return eventDate >= now - (7 * 24 * 60 * 60 * 1000); // Events from last 7 days forward
+          return eventDate >= now - (7 * 24 * 60 * 60 * 1000);
         });
 
         const eventsWithTickets = await Promise.all(
@@ -59,7 +57,7 @@ exports.handler = async (event) => {
               const ticketsResponse = await axios.get(
                 `${baseUrl}/events/${event.id}/issued_tickets`,
                 {
-                  headers: { 'Authorization': authHeader },
+                  headers: { 'Authorization': `Bearer ${apiKey}` },
                   params: { limit: 1000 }
                 }
               );
@@ -87,13 +85,11 @@ exports.handler = async (event) => {
               };
             } catch (error) {
               if (error.response?.status === 404) {
-                // Skip events that return 404 - they're deleted or inaccessible
                 console.warn(`Event ${event.id} returned 404 - skipping`);
                 return null;
               }
               
               console.error(`Error fetching tickets for event ${event.id}:`, error.message);
-              // Return partial data for events with ticket fetch errors
               return {
                 eventId: event.id,
                 eventName: event.name,
@@ -136,13 +132,13 @@ exports.handler = async (event) => {
 
         try {
           const eventResponse = await axios.get(`${baseUrl}/events/${eventId}`, {
-            headers: { 'Authorization': authHeader }
+            headers: { 'Authorization': `Bearer ${apiKey}` }
           });
 
           const ticketsResponse = await axios.get(
             `${baseUrl}/events/${eventId}/issued_tickets`,
             {
-              headers: { 'Authorization': authHeader },
+              headers: { 'Authorization': `Bearer ${apiKey}` },
               params: { limit: 1000 }
             }
           );
@@ -177,7 +173,7 @@ exports.handler = async (event) => {
 
       case 'getSalesVelocity':
         const salesEventsResponse = await axios.get(`${baseUrl}/events`, {
-          headers: { 'Authorization': authHeader },
+          headers: { 'Authorization': `Bearer ${apiKey}` },
           params: { 
             status: 'published',
             limit: 100
@@ -192,7 +188,7 @@ exports.handler = async (event) => {
               const ticketsResponse = await axios.get(
                 `${baseUrl}/events/${evt.id}/issued_tickets`,
                 {
-                  headers: { 'Authorization': authHeader },
+                  headers: { 'Authorization': `Bearer ${apiKey}` },
                   params: { limit: 1000 }
                 }
               );
