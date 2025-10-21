@@ -22,6 +22,9 @@ exports.handler = async (event) => {
   }
 
   const baseUrl = 'https://api.tickettailor.com/v1';
+  
+  // Try with query parameter auth (Ticket Tailor's preferred method)
+  const authParams = { api_key: apiKey };
 
   try {
     const { action, startDate, endDate } = JSON.parse(event.body || '{}');
@@ -32,10 +35,8 @@ exports.handler = async (event) => {
         today.setHours(0, 0, 0, 0);
         
         const eventsResponse = await axios.get(`${baseUrl}/events`, {
-          headers: { 
-            'Authorization': `Bearer ${apiKey}`
-          },
           params: { 
+            api_key: apiKey,
             status: 'published',
             start: startDate || today.toISOString(),
             limit: 100
@@ -57,8 +58,7 @@ exports.handler = async (event) => {
               const ticketsResponse = await axios.get(
                 `${baseUrl}/events/${event.id}/issued_tickets`,
                 {
-                  headers: { 'Authorization': `Bearer ${apiKey}` },
-                  params: { limit: 1000 }
+                  params: { api_key: apiKey, limit: 1000 }
                 }
               );
 
@@ -132,14 +132,13 @@ exports.handler = async (event) => {
 
         try {
           const eventResponse = await axios.get(`${baseUrl}/events/${eventId}`, {
-            headers: { 'Authorization': `Bearer ${apiKey}` }
+            params: authParams
           });
 
           const ticketsResponse = await axios.get(
             `${baseUrl}/events/${eventId}/issued_tickets`,
             {
-              headers: { 'Authorization': `Bearer ${apiKey}` },
-              params: { limit: 1000 }
+              params: { ...authParams, limit: 1000 }
             }
           );
 
@@ -173,8 +172,8 @@ exports.handler = async (event) => {
 
       case 'getSalesVelocity':
         const salesEventsResponse = await axios.get(`${baseUrl}/events`, {
-          headers: { 'Authorization': `Bearer ${apiKey}` },
           params: { 
+            api_key: apiKey,
             status: 'published',
             limit: 100
           }
@@ -188,8 +187,7 @@ exports.handler = async (event) => {
               const ticketsResponse = await axios.get(
                 `${baseUrl}/events/${evt.id}/issued_tickets`,
                 {
-                  headers: { 'Authorization': `Bearer ${apiKey}` },
-                  params: { limit: 1000 }
+                  params: { api_key: apiKey, limit: 1000 }
                 }
               );
 
