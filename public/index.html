@@ -20,7 +20,7 @@
         // API Helper
         const callAPI = async (endpoint, data) => {
             try {
-                const response = await fetch(`/api/${endpoint}`, {
+                const response = await fetch(`/.netlify/functions/${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
