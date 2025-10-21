@@ -29,16 +29,29 @@ exports.handler = async (event) => {
 
     switch (action) {
       case 'getEvents':
+        // Set date to today at midnight to only get future events
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
         const eventsResponse = await axios.get(`${baseUrl}/events`, {
           headers: { 'Authorization': authHeader },
           params: { 
             status: 'published',
-            start: startDate || new Date().toISOString(),
+            start: startDate || today.toISOString(),
             limit: 100
           }
         });
 
-        const events = eventsResponse.data.data || [];
+        let events = eventsResponse.data.data || [];
+        
+        // CRITICAL: Filter out events that are in the past
+        // Ticket Tailor sometimes returns old events even with the start parameter
+        const now = Date.now();
+        events = events.filter(evt => {
+          if (!evt.start) return true; // Keep if no date
+          const eventDate = new Date(evt.start.date || evt.start).getTime();
+          return eventDate >= now - (7 * 24 * 60 * 60 * 1000); // Events from last 7 days forward
+        });
 
         const eventsWithTickets = await Promise.all(
           events.map(async (event) => {
@@ -74,11 +87,13 @@ exports.handler = async (event) => {
               };
             } catch (error) {
               if (error.response?.status === 404) {
-                console.warn(`Event ${event.id} not found or no longer accessible`);
+                // Skip events that return 404 - they're deleted or inaccessible
+                console.warn(`Event ${event.id} returned 404 - skipping`);
                 return null;
               }
               
               console.error(`Error fetching tickets for event ${event.id}:`, error.message);
+              // Return partial data for events with ticket fetch errors
               return {
                 eventId: event.id,
                 eventName: event.name,
