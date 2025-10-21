@@ -4,12 +4,11 @@
   "description": "Real-time student recruitment analytics dashboard",
   "scripts": {
     "dev": "netlify dev",
-    "build": "echo 'No build step needed'",
+    "build": "npm install",
     "deploy": "netlify deploy --prod"
   },
   "dependencies": {
-    "axios": "^1.6.0",
-    "node-fetch": "^2.7.0"
+    "axios": "^1.6.0"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0"
