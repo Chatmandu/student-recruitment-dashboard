@@ -7,7 +7,6 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -30,19 +29,17 @@ exports.handler = async (event) => {
 
     switch (action) {
       case 'getEvents':
-        // Fetch all current events dynamically
         const eventsResponse = await axios.get(`${baseUrl}/events`, {
           headers: { 'Authorization': authHeader },
           params: { 
-            status: 'published', // Only get published events
-            start: startDate || new Date().toISOString(), // From today forward by default
-            limit: 100 // Adjust as needed
+            status: 'published',
+            start: startDate || new Date().toISOString(),
+            limit: 100
           }
         });
 
         const events = eventsResponse.data.data || [];
 
-        // Fetch ticket info for each event (with error handling)
         const eventsWithTickets = await Promise.all(
           events.map(async (event) => {
             try {
@@ -57,7 +54,6 @@ exports.handler = async (event) => {
               const tickets = ticketsResponse.data.data || [];
               const totalIssued = tickets.length;
               
-              // Group by ticket type
               const ticketsByType = tickets.reduce((acc, ticket) => {
                 const typeName = ticket.ticket_type?.name || 'Unknown';
                 acc[typeName] = (acc[typeName] || 0) + 1;
@@ -77,13 +73,11 @@ exports.handler = async (event) => {
                 venue: event.venue?.name || 'TBA'
               };
             } catch (error) {
-              // Handle 404 or other errors gracefully
               if (error.response?.status === 404) {
                 console.warn(`Event ${event.id} not found or no longer accessible`);
-                return null; // Skip this event
+                return null;
               }
               
-              // For other errors, return partial data
               console.error(`Error fetching tickets for event ${event.id}:`, error.message);
               return {
                 eventId: event.id,
@@ -102,7 +96,6 @@ exports.handler = async (event) => {
           })
         );
 
-        // Filter out null values (404 events)
         const validEvents = eventsWithTickets.filter(e => e !== null);
 
         return {
@@ -116,7 +109,6 @@ exports.handler = async (event) => {
         };
 
       case 'getEventDetails':
-        // Get details for a specific event (with 404 handling)
         const { eventId } = JSON.parse(event.body || '{}');
         
         if (!eventId) {
@@ -169,7 +161,6 @@ exports.handler = async (event) => {
         }
 
       case 'getSalesVelocity':
-        // Track ticket sales over time for all current events
         const salesEventsResponse = await axios.get(`${baseUrl}/events`, {
           headers: { 'Authorization': authHeader },
           params: { 
@@ -193,7 +184,6 @@ exports.handler = async (event) => {
 
               const tickets = ticketsResponse.data.data || [];
 
-              // Group tickets by date
               const ticketsByDate = tickets.reduce((acc, ticket) => {
                 const date = ticket.created_at.split('T')[0];
                 acc[date] = (acc[date] || 0) + 1;
@@ -209,7 +199,6 @@ exports.handler = async (event) => {
                 })).sort((a, b) => a.date.localeCompare(b.date))
               };
             } catch (error) {
-              // Skip events we can't access
               if (error.response?.status === 404) {
                 console.warn(`Event ${evt.id} not accessible for sales velocity`);
                 return null;
@@ -252,4 +241,3 @@ exports.handler = async (event) => {
     };
   }
 };
-# Force rebuild Wed 22 Oct 2025 00:12:53 BST
