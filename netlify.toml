@@ -1,11 +1,11 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
-  command = "npm install"
+  command = "npm install && cd netlify/functions && npm install && cd ../.."
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["axios"]
+  included_files = ["netlify/functions/node_modules/**"]
 
 [[redirects]]
   from = "/api/*"
