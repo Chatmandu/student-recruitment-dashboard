@@ -44,51 +44,72 @@ exports.handler = async (event) => {
           link.tags?.some(tag => tag.toLowerCase().includes('student') || tag.toLowerCase().includes('recruitment'))
         );
 
-        // Get click data for each recruitment link
-        const clickPromises = recruitmentLinks.map(link =>
-          axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${link.id}/clicks/summary`, {
+        console.log(`Found ${recruitmentLinks.length} recruitment links`);
+
+        // Get click data for each recruitment link (URL encode the ID)
+        const clickPromises = recruitmentLinks.map(link => {
+          const encodedId = encodeURIComponent(link.id);
+          return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/clicks/summary`, {
             headers: { 'Authorization': `Bearer ${token}` },
             params: { unit: 'day', units: -days }
-          }).catch(() => ({ data: { total_clicks: 0 } }))
-        );
+          }).catch(err => {
+            console.error(`Error fetching clicks for ${link.id}:`, err.response?.data || err.message);
+            return { data: { total_clicks: 0 } };
+          });
+        });
 
         const clicksData = await Promise.all(clickPromises);
 
         // Get referrer data for each link
-        const referrerPromises = recruitmentLinks.map(link =>
-          axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${link.id}/referrers`, {
+        const referrerPromises = recruitmentLinks.map(link => {
+          const encodedId = encodeURIComponent(link.id);
+          return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/referrers`, {
             headers: { 'Authorization': `Bearer ${token}` },
             params: { unit: 'day', units: -days }
-          }).catch(() => ({ data: { referrers: [] } }))
-        );
+          }).catch(err => {
+            console.error(`Error fetching referrers for ${link.id}:`, err.response?.data || err.message);
+            return { data: { referrers: [] } };
+          });
+        });
 
         const referrersData = await Promise.all(referrerPromises);
 
         // Get country data for each link
-        const countryPromises = recruitmentLinks.map(link =>
-          axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${link.id}/countries`, {
+        const countryPromises = recruitmentLinks.map(link => {
+          const encodedId = encodeURIComponent(link.id);
+          return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/countries`, {
             headers: { 'Authorization': `Bearer ${token}` },
             params: { unit: 'day', units: -days }
-          }).catch(() => ({ data: { metrics: [] } }))
-        );
+          }).catch(err => {
+            console.error(`Error fetching countries for ${link.id}:`, err.response?.data || err.message);
+            return { data: { metrics: [] } };
+          });
+        });
 
         const countriesData = await Promise.all(countryPromises);
 
         // Combine all data
-        const enrichedLinks = recruitmentLinks.map((link, i) => ({
-          id: link.id,
-          shortUrl: `https://${link.id}`,
-          longUrl: link.long_url,
-          title: link.title || link.long_url,
-          tags: link.tags || [],
-          created: link.created_at,
-          clicks: clicksData[i]?.data?.total_clicks || 0,
-          referrers: referrersData[i]?.data?.referrers || [],
-          countries: countriesData[i]?.data?.metrics || []
-        }));
+        const enrichedLinks = recruitmentLinks.map((link, i) => {
+          const clicks = clicksData[i]?.data?.total_clicks || 0;
+          console.log(`${link.id}: ${clicks} clicks`);
+          
+          return {
+            id: link.id,
+            shortUrl: `https://${link.id}`,
+            longUrl: link.long_url,
+            title: link.title || link.long_url,
+            tags: link.tags || [],
+            created: link.created_at,
+            clicks: clicks,
+            referrers: referrersData[i]?.data?.referrers || [],
+            countries: countriesData[i]?.data?.metrics || []
+          };
+        });
 
         // Calculate totals
         const totalClicks = enrichedLinks.reduce((sum, link) => sum + link.clicks, 0);
+
+        console.log(`Total clicks across all links: ${totalClicks}`);
 
         // Aggregate referrers across all links
         const allReferrers = {};
@@ -155,12 +176,13 @@ exports.handler = async (event) => {
 
         // Get detailed click data over time for top 5 links
         const topLinks = recruitmentLinksTrend.slice(0, 5);
-        const trendPromises = topLinks.map(link =>
-          axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${link.id}/clicks`, {
+        const trendPromises = topLinks.map(link => {
+          const encodedId = encodeURIComponent(link.id);
+          return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/clicks`, {
             headers: { 'Authorization': `Bearer ${token}` },
             params: { unit: 'day', units: -days }
-          }).catch(() => ({ data: { link_clicks: [] } }))
-        );
+          }).catch(() => ({ data: { link_clicks: [] } }));
+        });
 
         const trendsData = await Promise.all(trendPromises);
 
