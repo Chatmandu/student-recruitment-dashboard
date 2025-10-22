@@ -60,12 +60,17 @@ exports.handler = async (event) => {
 
         const clicksData = await Promise.all(clickPromises);
 
+        console.log('Fetching referrer data...');
+        
         // Get referrer data for each link
         const referrerPromises = recruitmentLinks.map(link => {
           const encodedId = encodeURIComponent(link.id);
           return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/referrers`, {
             headers: { 'Authorization': `Bearer ${token}` },
             params: { unit: 'day', units: days }
+          }).then(res => {
+            console.log(`Referrers for ${link.id}:`, res.data.referrers?.length || 0);
+            return res;
           }).catch(err => {
             console.error(`Error fetching referrers for ${link.id}:`, err.response?.data || err.message);
             return { data: { referrers: [] } };
