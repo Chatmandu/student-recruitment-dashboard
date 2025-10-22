@@ -28,8 +28,8 @@ exports.handler = async (event) => {
 
     switch (action) {
       case 'getEvents':
-        // DEBUG: Fetch ALL events with NO filters
-        console.log('DEBUG: Fetching ALL events with no filters...');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         
         const eventsResponse = await axios.get(`${baseUrl}/events`, {
           auth: {
@@ -40,102 +40,38 @@ exports.handler = async (event) => {
             'Accept': 'application/json'
           },
           params: { 
+            status: 'published',
+            start: startDate || today.toISOString(),
             limit: 100
-            // NO status filter
-            // NO date filter
           }
         });
 
         let events = eventsResponse.data.data || [];
         
-        console.log(`DEBUG: Received ${events.length} events from API`);
-        
-        // Log details about each event
-        events.forEach(evt => {
-          console.log(`DEBUG Event: ID=${evt.id}, Name="${evt.name}", Status=${evt.status}, Date=${evt.start?.date || evt.start}, Tickets=${evt.total_tickets}`);
+        // Map events WITHOUT fetching ticket data (since that returns 404)
+        const mappedEvents = events.map(event => {
+          return {
+            eventId: event.id,
+            eventName: event.name,
+            eventDate: event.start?.date || event.start,
+            eventUrl: event.url,
+            totalTicketsReleased: event.total_tickets || 0,
+            totalTicketsIssued: 0, // Can't access this
+            ticketsAvailable: event.total_tickets || 0,
+            ticketsByType: {},
+            status: event.status,
+            venue: event.venue?.name || 'TBA',
+            note: 'Ticket details not available with current API permissions'
+          };
         });
-
-        // Don't filter by date - show ALL events
-        const eventsWithTickets = await Promise.all(
-          events.map(async (event) => {
-            try {
-              const ticketsResponse = await axios.get(
-                `${baseUrl}/events/${event.id}/issued_tickets`,
-                {
-                  auth: {
-                    username: apiKey,
-                    password: ''
-                  },
-                  headers: {
-                    'Accept': 'application/json'
-                  },
-                  params: { limit: 1000 }
-                }
-              );
-
-              const tickets = ticketsResponse.data.data || [];
-              const totalIssued = tickets.length;
-              
-              const ticketsByType = tickets.reduce((acc, ticket) => {
-                const typeName = ticket.ticket_type?.name || 'Unknown';
-                acc[typeName] = (acc[typeName] || 0) + 1;
-                return acc;
-              }, {});
-
-              console.log(`DEBUG: Event ${event.id} - Successfully fetched ${totalIssued} tickets`);
-
-              return {
-                eventId: event.id,
-                eventName: event.name,
-                eventDate: event.start?.date || event.start,
-                eventUrl: event.url,
-                totalTicketsReleased: event.total_tickets || 0,
-                totalTicketsIssued: totalIssued,
-                ticketsAvailable: (event.total_tickets || 0) - totalIssued,
-                ticketsByType,
-                status: event.status,
-                venue: event.venue?.name || 'TBA'
-              };
-            } catch (error) {
-              if (error.response?.status === 404) {
-                console.warn(`DEBUG: Event ${event.id} (${event.name}) returned 404 when fetching tickets - event may be deleted`);
-                return null;
-              }
-              
-              console.error(`DEBUG: Error fetching tickets for event ${event.id}:`, error.message);
-              return {
-                eventId: event.id,
-                eventName: event.name,
-                eventDate: event.start?.date || event.start,
-                eventUrl: event.url,
-                totalTicketsReleased: event.total_tickets || 0,
-                totalTicketsIssued: 0,
-                ticketsAvailable: event.total_tickets || 0,
-                ticketsByType: {},
-                status: event.status,
-                venue: event.venue?.name || 'TBA',
-                error: 'Could not fetch ticket details'
-              };
-            }
-          })
-        );
-
-        const validEvents = eventsWithTickets.filter(e => e !== null);
-
-        console.log(`DEBUG: Returning ${validEvents.length} valid events to frontend`);
 
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
-            events: validEvents,
-            totalEvents: validEvents.length,
-            timestamp: new Date().toISOString(),
-            debug: {
-              totalFetched: events.length,
-              validReturned: validEvents.length,
-              filtered: events.length - validEvents.length
-            }
+            events: mappedEvents,
+            totalEvents: mappedEvents.length,
+            timestamp: new Date().toISOString()
           })
         };
 
@@ -161,22 +97,7 @@ exports.handler = async (event) => {
             }
           });
 
-          const ticketsResponse = await axios.get(
-            `${baseUrl}/events/${eventId}/issued_tickets`,
-            {
-              auth: {
-                username: apiKey,
-                password: ''
-              },
-              headers: {
-                'Accept': 'application/json'
-              },
-              params: { limit: 1000 }
-            }
-          );
-
           const eventData = eventResponse.data;
-          const tickets = ticketsResponse.data.data || [];
 
           return {
             statusCode: 200,
@@ -184,8 +105,9 @@ exports.handler = async (event) => {
             body: JSON.stringify({
               event: {
                 ...eventData,
-                ticketsIssued: tickets.length,
-                tickets: tickets
+                ticketsIssued: 0,
+                tickets: [],
+                note: 'Ticket details not available with current API permissions'
               }
             })
           };
@@ -204,71 +126,14 @@ exports.handler = async (event) => {
         }
 
       case 'getSalesVelocity':
-        const salesEventsResponse = await axios.get(`${baseUrl}/events`, {
-          auth: {
-            username: apiKey,
-            password: ''
-          },
-          headers: {
-            'Accept': 'application/json'
-          },
-          params: { 
-            limit: 100
-          }
-        });
-
-        const salesEvents = salesEventsResponse.data.data || [];
-
-        const velocityData = await Promise.all(
-          salesEvents.map(async (evt) => {
-            try {
-              const ticketsResponse = await axios.get(
-                `${baseUrl}/events/${evt.id}/issued_tickets`,
-                {
-                  auth: {
-                    username: apiKey,
-                    password: ''
-                  },
-                  headers: {
-                    'Accept': 'application/json'
-                  },
-                  params: { limit: 1000 }
-                }
-              );
-
-              const tickets = ticketsResponse.data.data || [];
-
-              const ticketsByDate = tickets.reduce((acc, ticket) => {
-                const date = ticket.created_at.split('T')[0];
-                acc[date] = (acc[date] || 0) + 1;
-                return acc;
-              }, {});
-
-              return {
-                eventId: evt.id,
-                eventName: evt.name,
-                dailySales: Object.entries(ticketsByDate).map(([date, count]) => ({
-                  date,
-                  count
-                })).sort((a, b) => a.date.localeCompare(b.date))
-              };
-            } catch (error) {
-              if (error.response?.status === 404) {
-                console.warn(`Event ${evt.id} not accessible for sales velocity`);
-                return null;
-              }
-              console.error(`Error fetching sales velocity for event ${evt.id}:`, error.message);
-              return null;
-            }
-          })
-        );
-
+        // Can't provide sales velocity without ticket access
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
-            salesVelocity: velocityData.filter(v => v !== null),
-            timestamp: new Date().toISOString()
+            salesVelocity: [],
+            timestamp: new Date().toISOString(),
+            note: 'Sales velocity not available without ticket access permissions'
           })
         };
 
