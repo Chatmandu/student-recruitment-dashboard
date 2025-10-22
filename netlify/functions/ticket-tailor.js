@@ -48,29 +48,33 @@ exports.handler = async (event) => {
 
         let events = eventsResponse.data.data || [];
         
-        // Map events WITHOUT fetching ticket data (since that returns 404)
-        const mappedEvents = events.map(event => {
+        // Map events to match frontend expectations
+        const mappedEvents = events.map(evt => {
           return {
-            eventId: event.id,
-            eventName: event.name,
-            eventDate: event.start?.date || event.start,
-            eventUrl: event.url,
-            totalTicketsReleased: event.total_tickets || 0,
-            totalTicketsIssued: 0, // Can't access this
-            ticketsAvailable: event.total_tickets || 0,
-            ticketsByType: {},
-            status: event.status,
-            venue: event.venue?.name || 'TBA',
-            note: 'Ticket details not available with current API permissions'
+            id: evt.id,
+            name: evt.name,
+            start: evt.start?.date || evt.start,
+            venue: evt.venue?.name || 'TBA',
+            capacity: evt.total_tickets || 0,
+            sold: 0, // Can't access with current permissions
+            available: evt.total_tickets || 0,
+            url: evt.url,
+            status: evt.status
           };
         });
 
+        const totalSold = mappedEvents.reduce((sum, evt) => sum + evt.sold, 0);
+
+        // Return in format frontend expects
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
-            events: mappedEvents,
-            totalEvents: mappedEvents.length,
+            upcomingEvents: mappedEvents,
+            summary: {
+              totalSold: totalSold,
+              totalEvents: mappedEvents.length
+            },
             timestamp: new Date().toISOString()
           })
         };
@@ -126,7 +130,6 @@ exports.handler = async (event) => {
         }
 
       case 'getSalesVelocity':
-        // Can't provide sales velocity without ticket access
         return {
           statusCode: 200,
           headers,
