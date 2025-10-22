@@ -50,13 +50,27 @@ exports.handler = async (event) => {
         
         console.log(`Fetched ${events.length} events from Ticket Tailor`);
         
-        // Fetch ticket data for each event
+        // Fetch ticket data for each event via ORDERS (not issued_tickets endpoint)
         const eventsWithTickets = await Promise.all(
           events.map(async (evt) => {
             try {
-              const ticketsResponse = await axios.get(
-                `${baseUrl}/events/${evt.id}/issued_tickets`,
-                {
+              // Get all orders for this event
+              let allOrders = [];
+              let hasMore = true;
+              let startingAfter = null;
+              
+              // Paginate through orders
+              while (hasMore) {
+                const ordersParams = {
+                  limit: 100,
+                  event_id: evt.id
+                };
+                
+                if (startingAfter) {
+                  ordersParams.starting_after = startingAfter;
+                }
+                
+                const ordersResponse = await axios.get(`${baseUrl}/orders`, {
                   auth: {
                     username: apiKey,
                     password: ''
@@ -64,26 +78,29 @@ exports.handler = async (event) => {
                   headers: {
                     'Accept': 'application/json'
                   },
-                  params: { limit: 1000 }
+                  params: ordersParams
+                });
+                
+                const orders = ordersResponse.data.data || [];
+                allOrders = allOrders.concat(orders);
+                
+                // Check if there are more pages
+                if (orders.length < 100) {
+                  hasMore = false;
+                } else {
+                  startingAfter = orders[orders.length - 1].id;
                 }
-              );
-
-              // LOG THE RAW RESPONSE to see what structure we're getting
-              console.log(`RAW issued_tickets response for ${evt.id}:`, JSON.stringify(ticketsResponse.data, null, 2));
-              
-              // Try multiple ways to extract the data
-              let tickets = [];
-              if (ticketsResponse.data.data && Array.isArray(ticketsResponse.data.data)) {
-                tickets = ticketsResponse.data.data;
-              } else if (Array.isArray(ticketsResponse.data)) {
-                tickets = ticketsResponse.data;
-              } else if (ticketsResponse.data.issued_tickets && Array.isArray(ticketsResponse.data.issued_tickets)) {
-                tickets = ticketsResponse.data.issued_tickets;
               }
               
-              const totalIssued = tickets.length;
+              // Count issued tickets from orders
+              let totalIssued = 0;
+              allOrders.forEach(order => {
+                if (order.issued_tickets && Array.isArray(order.issued_tickets)) {
+                  totalIssued += order.issued_tickets.length;
+                }
+              });
               
-              console.log(`Event ${evt.name}: ${totalIssued} tickets issued out of ${evt.total_tickets || 0}`);
+              console.log(`Event ${evt.name}: ${totalIssued} tickets issued from ${allOrders.length} orders (capacity: ${evt.total_tickets || 0})`);
               
               return {
                 id: evt.id,
@@ -97,14 +114,7 @@ exports.handler = async (event) => {
                 status: evt.status
               };
             } catch (error) {
-              if (error.response?.status === 404) {
-                console.warn(`Event ${evt.id} returned 404 when fetching tickets - endpoint may not exist for this event`);
-              } else if (error.response?.status === 403) {
-                console.warn(`Event ${evt.id} returned 403 - API key may not have permission to access issued_tickets`);
-                console.warn(`Check your API key permissions in Ticket Tailor dashboard`);
-              } else {
-                console.error(`Error fetching tickets for event ${evt.id}:`, error.response?.status, error.message);
-              }
+              console.error(`Error fetching orders for event ${evt.id}:`, error.response?.status, error.message);
               
               // Return event with no ticket data if there's an error
               return {
@@ -163,29 +173,31 @@ exports.handler = async (event) => {
             }
           });
 
-          const ticketsResponse = await axios.get(
-            `${baseUrl}/events/${eventId}/issued_tickets`,
-            {
-              auth: {
-                username: apiKey,
-                password: ''
-              },
-              headers: {
-                'Accept': 'application/json'
-              },
-              params: { limit: 1000 }
+          // Get orders for this event instead of using issued_tickets endpoint
+          const ordersResponse = await axios.get(`${baseUrl}/orders`, {
+            auth: {
+              username: apiKey,
+              password: ''
+            },
+            headers: {
+              'Accept': 'application/json'
+            },
+            params: {
+              event_id: eventId,
+              limit: 1000
             }
-          );
+          });
 
           const eventData = eventResponse.data;
+          const orders = ordersResponse.data.data || [];
           
-          // Extract tickets with multiple fallbacks
-          let tickets = [];
-          if (ticketsResponse.data.data && Array.isArray(ticketsResponse.data.data)) {
-            tickets = ticketsResponse.data.data;
-          } else if (Array.isArray(ticketsResponse.data)) {
-            tickets = ticketsResponse.data;
-          }
+          // Extract all issued tickets from orders
+          let allTickets = [];
+          orders.forEach(order => {
+            if (order.issued_tickets && Array.isArray(order.issued_tickets)) {
+              allTickets = allTickets.concat(order.issued_tickets);
+            }
+          });
 
           return {
             statusCode: 200,
@@ -193,8 +205,8 @@ exports.handler = async (event) => {
             body: JSON.stringify({
               event: {
                 ...eventData,
-                ticketsIssued: tickets.length,
-                tickets: tickets
+                ticketsIssued: allTickets.length,
+                tickets: allTickets
               }
             })
           };
@@ -232,29 +244,32 @@ exports.handler = async (event) => {
         const velocityData = await Promise.all(
           salesEvents.map(async (evt) => {
             try {
-              const ticketsResponse = await axios.get(
-                `${baseUrl}/events/${evt.id}/issued_tickets`,
-                {
-                  auth: {
-                    username: apiKey,
-                    password: ''
-                  },
-                  headers: {
-                    'Accept': 'application/json'
-                  },
-                  params: { limit: 1000 }
+              // Get orders instead of issued_tickets
+              const ordersResponse = await axios.get(`${baseUrl}/orders`, {
+                auth: {
+                  username: apiKey,
+                  password: ''
+                },
+                headers: {
+                  'Accept': 'application/json'
+                },
+                params: {
+                  event_id: evt.id,
+                  limit: 1000
                 }
-              );
+              });
 
-              // Extract tickets with fallbacks
-              let tickets = [];
-              if (ticketsResponse.data.data && Array.isArray(ticketsResponse.data.data)) {
-                tickets = ticketsResponse.data.data;
-              } else if (Array.isArray(ticketsResponse.data)) {
-                tickets = ticketsResponse.data;
-              }
+              const orders = ordersResponse.data.data || [];
+              
+              // Extract all issued tickets from orders
+              let allTickets = [];
+              orders.forEach(order => {
+                if (order.issued_tickets && Array.isArray(order.issued_tickets)) {
+                  allTickets = allTickets.concat(order.issued_tickets);
+                }
+              });
 
-              const ticketsByDate = tickets.reduce((acc, ticket) => {
+              const ticketsByDate = allTickets.reduce((acc, ticket) => {
                 const date = ticket.created_at.split('T')[0];
                 acc[date] = (acc[date] || 0) + 1;
                 return acc;
@@ -269,10 +284,6 @@ exports.handler = async (event) => {
                 })).sort((a, b) => a.date.localeCompare(b.date))
               };
             } catch (error) {
-              if (error.response?.status === 404) {
-                console.warn(`Event ${evt.id} not accessible for sales velocity`);
-                return null;
-              }
               console.error(`Error fetching sales velocity for event ${evt.id}:`, error.message);
               return null;
             }
