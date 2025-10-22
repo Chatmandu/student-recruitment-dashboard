@@ -69,10 +69,13 @@ exports.handler = async (event) => {
             headers: { 'Authorization': `Bearer ${token}` },
             params: { unit: 'day', units: days }
           }).then(res => {
+            // LOG THE FULL RESPONSE to see what Bitly is actually returning
+            console.log(`RAW referrer response for ${link.id}:`, JSON.stringify(res.data, null, 2));
             console.log(`Referrers for ${link.id}:`, res.data.referrers?.length || 0);
             return res;
           }).catch(err => {
             console.error(`Error fetching referrers for ${link.id}:`, err.response?.data || err.message);
+            console.error(`Status code:`, err.response?.status);
             return { data: { referrers: [] } };
           });
         });
