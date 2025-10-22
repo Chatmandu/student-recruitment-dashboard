@@ -28,8 +28,8 @@ exports.handler = async (event) => {
 
     switch (action) {
       case 'getEvents':
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // DEBUG: Fetch ALL events with NO filters
+        console.log('DEBUG: Fetching ALL events with no filters...');
         
         const eventsResponse = await axios.get(`${baseUrl}/events`, {
           auth: {
@@ -40,21 +40,22 @@ exports.handler = async (event) => {
             'Accept': 'application/json'
           },
           params: { 
-            status: 'published',
-            start: startDate || today.toISOString(),
             limit: 100
+            // NO status filter
+            // NO date filter
           }
         });
 
         let events = eventsResponse.data.data || [];
         
-        const now = Date.now();
-        events = events.filter(evt => {
-          if (!evt.start) return true;
-          const eventDate = new Date(evt.start.date || evt.start).getTime();
-          return eventDate >= now - (7 * 24 * 60 * 60 * 1000);
+        console.log(`DEBUG: Received ${events.length} events from API`);
+        
+        // Log details about each event
+        events.forEach(evt => {
+          console.log(`DEBUG Event: ID=${evt.id}, Name="${evt.name}", Status=${evt.status}, Date=${evt.start?.date || evt.start}, Tickets=${evt.total_tickets}`);
         });
 
+        // Don't filter by date - show ALL events
         const eventsWithTickets = await Promise.all(
           events.map(async (event) => {
             try {
@@ -81,6 +82,8 @@ exports.handler = async (event) => {
                 return acc;
               }, {});
 
+              console.log(`DEBUG: Event ${event.id} - Successfully fetched ${totalIssued} tickets`);
+
               return {
                 eventId: event.id,
                 eventName: event.name,
@@ -95,11 +98,11 @@ exports.handler = async (event) => {
               };
             } catch (error) {
               if (error.response?.status === 404) {
-                console.warn(`Event ${event.id} returned 404 - skipping`);
+                console.warn(`DEBUG: Event ${event.id} (${event.name}) returned 404 when fetching tickets - event may be deleted`);
                 return null;
               }
               
-              console.error(`Error fetching tickets for event ${event.id}:`, error.message);
+              console.error(`DEBUG: Error fetching tickets for event ${event.id}:`, error.message);
               return {
                 eventId: event.id,
                 eventName: event.name,
@@ -119,13 +122,20 @@ exports.handler = async (event) => {
 
         const validEvents = eventsWithTickets.filter(e => e !== null);
 
+        console.log(`DEBUG: Returning ${validEvents.length} valid events to frontend`);
+
         return {
           statusCode: 200,
           headers,
           body: JSON.stringify({
             events: validEvents,
             totalEvents: validEvents.length,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            debug: {
+              totalFetched: events.length,
+              validReturned: validEvents.length,
+              filtered: events.length - validEvents.length
+            }
           })
         };
 
@@ -203,7 +213,6 @@ exports.handler = async (event) => {
             'Accept': 'application/json'
           },
           params: { 
-            status: 'published',
             limit: 100
           }
         });
