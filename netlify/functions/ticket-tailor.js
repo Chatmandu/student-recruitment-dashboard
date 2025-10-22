@@ -32,8 +32,11 @@ exports.handler = async (event) => {
         today.setHours(0, 0, 0, 0);
         
         const eventsResponse = await axios.get(`${baseUrl}/events`, {
-          headers: { 
-            'X-API-Key': apiKey,
+          auth: {
+            username: apiKey,
+            password: ''
+          },
+          headers: {
             'Accept': 'application/json'
           },
           params: { 
@@ -58,8 +61,11 @@ exports.handler = async (event) => {
               const ticketsResponse = await axios.get(
                 `${baseUrl}/events/${event.id}/issued_tickets`,
                 {
-                  headers: { 
-                    'X-API-Key': apiKey,
+                  auth: {
+                    username: apiKey,
+                    password: ''
+                  },
+                  headers: {
                     'Accept': 'application/json'
                   },
                   params: { limit: 1000 }
@@ -136,8 +142,11 @@ exports.handler = async (event) => {
 
         try {
           const eventResponse = await axios.get(`${baseUrl}/events/${eventId}`, {
-            headers: { 
-              'X-API-Key': apiKey,
+            auth: {
+              username: apiKey,
+              password: ''
+            },
+            headers: {
               'Accept': 'application/json'
             }
           });
@@ -145,8 +154,11 @@ exports.handler = async (event) => {
           const ticketsResponse = await axios.get(
             `${baseUrl}/events/${eventId}/issued_tickets`,
             {
-              headers: { 
-                'X-API-Key': apiKey,
+              auth: {
+                username: apiKey,
+                password: ''
+              },
+              headers: {
                 'Accept': 'application/json'
               },
               params: { limit: 1000 }
@@ -183,8 +195,11 @@ exports.handler = async (event) => {
 
       case 'getSalesVelocity':
         const salesEventsResponse = await axios.get(`${baseUrl}/events`, {
-          headers: { 
-            'X-API-Key': apiKey,
+          auth: {
+            username: apiKey,
+            password: ''
+          },
+          headers: {
             'Accept': 'application/json'
           },
           params: { 
@@ -201,8 +216,11 @@ exports.handler = async (event) => {
               const ticketsResponse = await axios.get(
                 `${baseUrl}/events/${evt.id}/issued_tickets`,
                 {
-                  headers: { 
-                    'X-API-Key': apiKey,
+                  auth: {
+                    username: apiKey,
+                    password: ''
+                  },
+                  headers: {
                     'Accept': 'application/json'
                   },
                   params: { limit: 1000 }
