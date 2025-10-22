@@ -69,9 +69,9 @@ exports.handler = async (event) => {
             headers: { 'Authorization': `Bearer ${token}` },
             params: { unit: 'day', units: days }
           }).then(res => {
-            // LOG THE FULL RESPONSE to see what Bitly is actually returning
-            console.log(`RAW referrer response for ${link.id}:`, JSON.stringify(res.data, null, 2));
-            console.log(`Referrers for ${link.id}:`, res.data.referrers?.length || 0);
+            // Bitly returns referrers in 'metrics' array, not 'referrers'
+            const referrerCount = res.data.metrics?.length || 0;
+            console.log(`Referrers for ${link.id}:`, referrerCount);
             return res;
           }).catch(err => {
             console.error(`Error fetching referrers for ${link.id}:`, err.response?.data || err.message);
@@ -109,7 +109,7 @@ exports.handler = async (event) => {
             tags: link.tags || [],
             created: link.created_at,
             clicks: clicks,
-            referrers: referrersData[i]?.data?.referrers || [],
+            referrers: referrersData[i]?.data?.metrics || [],
             countries: countriesData[i]?.data?.metrics || []
           };
         });
@@ -123,7 +123,7 @@ exports.handler = async (event) => {
         const allReferrers = {};
         enrichedLinks.forEach(link => {
           link.referrers.forEach(ref => {
-            const referrer = ref.referrer || 'direct';
+            const referrer = ref.value || 'direct';
             allReferrers[referrer] = (allReferrers[referrer] || 0) + (ref.clicks || 0);
           });
         });
