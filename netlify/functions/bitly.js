@@ -51,7 +51,7 @@ exports.handler = async (event) => {
           const encodedId = encodeURIComponent(link.id);
           return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/clicks/summary`, {
             headers: { 'Authorization': `Bearer ${token}` },
-            params: { unit: 'day', units: -days }
+            params: { unit: 'day', units: days }
           }).catch(err => {
             console.error(`Error fetching clicks for ${link.id}:`, err.response?.data || err.message);
             return { data: { total_clicks: 0 } };
@@ -65,7 +65,7 @@ exports.handler = async (event) => {
           const encodedId = encodeURIComponent(link.id);
           return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/referrers`, {
             headers: { 'Authorization': `Bearer ${token}` },
-            params: { unit: 'day', units: -days }
+            params: { unit: 'day', units: days }
           }).catch(err => {
             console.error(`Error fetching referrers for ${link.id}:`, err.response?.data || err.message);
             return { data: { referrers: [] } };
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
           const encodedId = encodeURIComponent(link.id);
           return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/countries`, {
             headers: { 'Authorization': `Bearer ${token}` },
-            params: { unit: 'day', units: -days }
+            params: { unit: 'day', units: days }
           }).catch(err => {
             console.error(`Error fetching countries for ${link.id}:`, err.response?.data || err.message);
             return { data: { metrics: [] } };
@@ -180,7 +180,7 @@ exports.handler = async (event) => {
           const encodedId = encodeURIComponent(link.id);
           return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/clicks`, {
             headers: { 'Authorization': `Bearer ${token}` },
-            params: { unit: 'day', units: -days }
+            params: { unit: 'day', units: days }
           }).catch(() => ({ data: { link_clicks: [] } }));
         });
 
