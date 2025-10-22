@@ -86,11 +86,11 @@ exports.handler = async (event) => {
               };
             } catch (error) {
               if (error.response?.status === 404) {
-                console.warn(`Event ${evt.id} returned 404 when fetching tickets`);
-                return null;
+                console.warn(`Event ${evt.id} returned 404 when fetching tickets - showing event without ticket data`);
+              } else {
+                console.error(`Error fetching tickets for event ${evt.id}:`, error.message);
               }
               
-              console.error(`Error fetching tickets for event ${evt.id}:`, error.message);
               // Return event with no ticket data if there's an error
               return {
                 id: evt.id,
@@ -107,8 +107,8 @@ exports.handler = async (event) => {
           })
         );
 
-        // Filter out null events (404s)
-        const validEvents = eventsWithTickets.filter(e => e !== null);
+        // All events are valid now (even if ticket fetch failed)
+        const validEvents = eventsWithTickets;
         const totalSold = validEvents.reduce((sum, evt) => sum + evt.sold, 0);
 
         console.log(`Returning ${validEvents.length} events with ${totalSold} total tickets sold`);
