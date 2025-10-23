@@ -1,603 +1,1021 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Recruitment Dashboard</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Marketing Lead to Applicant Workflow Process</title>
+    <style>
+        @page {
+            margin: 2.54cm;
+            size: A4;
+        }
+        
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #000000;
+            margin: 0;
+            padding: 20px;
+            background: white;
+        }
+        
+        h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #1F4E78;
+            margin-top: 0;
+            margin-bottom: 12pt;
+            page-break-after: avoid;
+            border-bottom: 3px solid #1F4E78;
+            padding-bottom: 6pt;
+        }
+        
+        h2 {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #1F4E78;
+            margin-top: 18pt;
+            margin-bottom: 10pt;
+            page-break-after: avoid;
+        }
+        
+        h3 {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #2E5C8A;
+            margin-top: 14pt;
+            margin-bottom: 8pt;
+            page-break-after: avoid;
+        }
+        
+        h4 {
+            font-size: 11pt;
+            font-weight: bold;
+            font-style: italic;
+            color: #2E5C8A;
+            margin-top: 10pt;
+            margin-bottom: 6pt;
+            page-break-after: avoid;
+        }
+        
+        p {
+            margin-top: 0;
+            margin-bottom: 10pt;
+        }
+        
+        ul, ol {
+            margin-top: 6pt;
+            margin-bottom: 10pt;
+            padding-left: 30px;
+        }
+        
+        li {
+            margin-bottom: 4pt;
+        }
+        
+        .highlight-box {
+            background-color: #FFF9E6;
+            border-left: 4px solid #F4B400;
+            padding: 12pt;
+            margin: 12pt 0;
+            page-break-inside: avoid;
+        }
+        
+        .info-box {
+            background-color: #E8F4FD;
+            border-left: 4px solid #4285F4;
+            padding: 12pt;
+            margin: 12pt 0;
+            page-break-inside: avoid;
+        }
+        
+        .warning-box {
+            background-color: #FDECEA;
+            border-left: 4px solid #EA4335;
+            padding: 12pt;
+            margin: 12pt 0;
+            page-break-inside: avoid;
+        }
+        
+        .workflow-tree {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 10pt;
+            background-color: #F8F9FA;
+            padding: 15pt;
+            margin: 12pt 0;
+            white-space: pre-wrap;
+            border: 1px solid #DADCE0;
+            border-radius: 4px;
+            page-break-inside: avoid;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16pt 0;
+            page-break-inside: avoid;
+            font-size: 10pt;
+        }
+        
+        th {
+            background-color: #1F4E78;
+            color: white;
+            padding: 10pt 8pt;
+            text-align: left;
+            font-weight: bold;
+            border: 1px solid #1F4E78;
+        }
+        
+        td {
+            padding: 8pt;
+            border: 1px solid #DADCE0;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #F8F9FA;
+        }
+        
+        .checkbox-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        .checkbox-list li {
+            padding-left: 25px;
+            text-indent: -25px;
+            margin-bottom: 6pt;
+        }
+        
+        .checkbox-list li:before {
+            content: "☐ ";
+            padding-right: 8px;
+        }
+        
+        strong {
+            font-weight: bold;
+        }
+        
+        em {
+            font-style: italic;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
 </head>
-<body class="bg-gray-50">
-    <div id="root"></div>
+<body>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+<h1>Marketing Lead to Applicant Workflow Process</h1>
 
-        // API Helper
-        const callAPI = async (endpoint, data) => {
-            try {
-                const response = await fetch(`/.netlify/functions/${endpoint}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
-                return await response.json();
-            } catch (error) {
-                console.error(`Error calling ${endpoint}:`, error);
-                throw error;
-            }
-        };
+<h2>Overview</h2>
+<p>This document outlines the process for managing the transition from marketing leads to applicants in Mailchimp, ensuring applicants are excluded from marketing workflows once they submit an application.</p>
 
-        // KPI Card Component
-        const KPICard = ({ title, value, change, icon, color, loading, subtitle }) => {
-            const isPositive = change >= 0;
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                            <p className="text-gray-500 text-sm font-medium uppercase tracking-wide">{title}</p>
-                            {loading ? (
-                                <div className="animate-pulse mt-2">
-                                    <div className="h-8 bg-gray-200 rounded w-24"></div>
-                                </div>
-                            ) : (
-                                <>
-                                    <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
-                                    {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-                                    {change !== null && change !== undefined && (
-                                        <p className={`text-sm mt-2 font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                            <i className={`fas fa-arrow-${isPositive ? 'up' : 'down'} mr-1`}></i>
-                                            {Math.abs(change)}% vs last week
-                                        </p>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                        <div className={`${color} p-4 rounded-full shadow-md`}>
-                            <i className={`${icon} text-2xl text-white`}></i>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
+<h2>The Challenge</h2>
+<p><strong>Problem:</strong> Our Student Information System (SIS) cannot currently integrate directly with Mailchimp.</p>
+<p><strong>Solution:</strong> Weekly manual import from SIS to Mailchimp to flag applicants and exclude them from marketing workflows.</p>
 
-        // Chart Component
-        const ChartComponent = ({ title, type, data, labels, loading, height = 300 }) => {
-            const chartRef = useRef(null);
-            const chartInstance = useRef(null);
+<h2>Simplified Multi-Source Workflow Architecture</h2>
 
-            useEffect(() => {
-                if (chartRef.current && !loading && data && labels) {
-                    const ctx = chartRef.current.getContext('2d');
-                    
-                    if (chartInstance.current) {
-                        chartInstance.current.destroy();
-                    }
+<h3>Source-Based Segmentation Strategy</h3>
+<p>Your marketing workflows are now streamlined into source-specific sequences:</p>
 
-                    chartInstance.current = new Chart(ctx, {
-                        type: type,
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: title,
-                                data: data,
-                                backgroundColor: type === 'line' ? 'rgba(59, 130, 246, 0.1)' : [
-                                    'rgba(59, 130, 246, 0.8)',
-                                    'rgba(16, 185, 129, 0.8)',
-                                    'rgba(245, 158, 11, 0.8)',
-                                    'rgba(239, 68, 68, 0.8)',
-                                    'rgba(139, 92, 246, 0.8)',
-                                    'rgba(236, 72, 153, 0.8)',
-                                    'rgba(99, 102, 241, 0.8)',
-                                    'rgba(251, 146, 60, 0.8)'
-                                ],
-                                borderColor: 'rgba(59, 130, 246, 1)',
-                                borderWidth: 2,
-                                fill: type === 'line',
-                                tension: 0.4
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: type !== 'line',
-                                    position: 'bottom'
-                                },
-                                tooltip: {
-                                    mode: 'index',
-                                    intersect: false
-                                }
-                            },
-                            scales: type === 'line' || type === 'bar' ? {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        precision: 0
-                                    }
-                                }
-                            } : {}
-                        }
-                    });
-                }
+<div class="workflow-tree">Marketing Workflows: Source-Specific
 
-                return () => {
-                    if (chartInstance.current) {
-                        chartInstance.current.destroy();
-                    }
-                };
-            }, [data, labels, type, title, loading]);
+├─ Event Attendees (Manual follow-up → Shared Nurture)
+│   └─ Manual: Event-specific follow-up email
+│   └─ Then: Enters shared 6-email nurture sequence
+│   └─ If already in sequence: Manual email sent + continues current position
+│
+├─ EOI Form Submitters (Shared Nurture)
+│   └─ Enters shared 6-email nurture sequence immediately
+│
+├─ Landing Page Sign-ups (Shared Nurture)
+│   └─ Enters shared 6-email nurture sequence immediately
+│
+├─ FindAMasters Enquiries (SPECIAL HANDLING)
+│   └─ Day 0: Acknowledge source + Privacy notice
+│   └─ Day 3: Course information
+│   └─ Day 7: Application process
+│   └─ Day 14: Deadline reminder
+│   └─ Monitor: Flag if no engagement after 30 days
+│
+└─ Website Contact Form (Separate Sequence)
+    └─ Day 0: Enquiry response + opt-in confirmation
+    └─ Day 3: Course discovery guide
+    └─ Day 7: Event invitation
+    └─ Day 14: Application information</div>
 
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">{title}</h3>
-                    {loading ? (
-                        <div className="animate-pulse" style={{ height: `${height}px` }}>
-                            <div className="h-full bg-gray-200 rounded"></div>
-                        </div>
-                    ) : (
-                        <div style={{ height: `${height}px` }}>
-                            <canvas ref={chartRef}></canvas>
-                        </div>
-                    )}
-                </div>
-            );
-        };
+<div class="info-box">
+<p><strong>Shared 6-Email Nurture Sequence:</strong></p>
+<ul>
+<li>Day 0: Application encouragement</li>
+<li>Day 3: Open events promotion</li>
+<li>Day 7: Student stories</li>
+<li>Day 14: Application deadlines</li>
+<li>Day 21: Scholarship information</li>
+<li>Day 30: Reputational comms</li>
+</ul>
+</div>
 
-        // Events Table Component
-        const EventsTable = ({ events, loading }) => {
-            const [sortField, setSortField] = useState('start');
-            const [sortDirection, setSortDirection] = useState('asc');
+<div class="warning-box">
+<p><strong>All workflows STOP when:</strong> Tag "Applicant: [Year]" is added</p>
+</div>
 
-            const sortedEvents = events ? [...events].sort((a, b) => {
-                const aVal = a[sortField];
-                const bVal = b[sortField];
-                const modifier = sortDirection === 'asc' ? 1 : -1;
-                return aVal > bVal ? modifier : -modifier;
-            }) : [];
+<h2>Enhanced Workflow Conditions</h2>
 
-            const toggleSort = (field) => {
-                if (sortField === field) {
-                    setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-                } else {
-                    setSortField(field);
-                    setSortDirection('asc');
-                }
-            };
+<h3>Marketing Workflows (Must Exclude Applicants)</h3>
+<p><strong>For ALL marketing automation sequences:</strong></p>
+<p><strong>Send to contacts who meet ALL of these conditions:</strong></p>
+<ul>
+<li>Status is "Subscribed"</li>
+<li>Does NOT have any tag starting with "Applicant:"</li>
+<li>Does NOT have any tag starting with "Student:"</li>
+</ul>
 
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">
-                        <i className="fas fa-calendar-alt mr-2"></i>Upcoming Events
-                    </h3>
-                    {loading ? (
-                        <div className="animate-pulse space-y-3">
-                            {[1,2,3,4,5].map(i => (
-                                <div key={i} className="h-16 bg-gray-200 rounded"></div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('start')}>
-                                            Date {sortField === 'start' && (
-                                                <i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>
-                                            )}
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('name')}>
-                                            Event Name {sortField === 'name' && (
-                                                <i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>
-                                            )}
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Venue</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('capacity')}>
-                                            Capacity {sortField === 'capacity' && (
-                                                <i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>
-                                            )}
-                                        </th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('sold')}>
-                                            Attending {sortField === 'sold' && (
-                                                <i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>
-                                            )}
-                                        </th>
+<p><strong>Optional additional conditions for segmentation:</strong></p>
+<ul>
+<li>Has tag "Source: [specific source]" (for source-specific campaigns)</li>
+<li>Has tag "Attended: [event]" (for event follow-up)</li>
+<li>Country is "[region]" (for regional campaigns)</li>
+<li>Course Name contains "[programme]" (for course-specific info)</li>
+</ul>
 
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {sortedEvents.map((event, index) => {
-                                        const date = new Date(event.start);
-                                        
-                                        return (
-                                            <tr key={index} className="hover:bg-gray-50">
-                                                <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                                                    {date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                                    {event.name}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">
-                                                    {event.venue || 'TBA'}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                                                    {event.capacity}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-900 text-right font-semibold">
-                                                    {event.sold}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            );
-        };
+<h2>Source-Specific Workflow Setup</h2>
 
-        // Links Table Component
-        const LinksTable = ({ links, loading }) => {
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">
-                        <i className="fas fa-link mr-2"></i>Student Recruitment Links
-                    </h3>
-                    {loading ? (
-                        <div className="animate-pulse space-y-3">
-                            {[1,2,3,4,5].map(i => (
-                                <div key={i} className="h-12 bg-gray-200 rounded"></div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Short Link</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Destination</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Clicks</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {links && links.map((link, index) => (
-                                        <tr key={index} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3 text-sm text-blue-600">
-                                                <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                                    {link.id}
-                                                </a>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600 max-w-md truncate">
-                                                {link.title || link.longUrl}
-                                            </td>
-                                            <td className="px-4 py-3 text-xs">
-                                                {link.tags && link.tags.map((tag, i) => (
-                                                    <span key={i} className="inline-block bg-blue-100 text-blue-800 rounded-full px-2 py-1 mr-1 mb-1">
-                                                        {tag}
-                                                    </span>
-                                                ))}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
-                                                {link.clicks.toLocaleString()}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            );
-        };
+<h3>Workflow 1: Event Attendee Process</h3>
 
-        // Main Dashboard
-        const Dashboard = () => {
-            const [loading, setLoading] = useState(true);
-            const [autoRefresh, setAutoRefresh] = useState(false);
-            const [error, setError] = useState(null);
-            
-            // Data states
-            const [leadStats, setLeadStats] = useState(null);
-            const [bitlyData, setBitlyData] = useState(null);
-            const [eventsData, setEventsData] = useState(null);
-            const [lastUpdated, setLastUpdated] = useState(null);
+<h4>Manual Step (Outside Mailchimp):</h4>
+<ul>
+<li><strong>When:</strong> Event concludes</li>
+<li><strong>Action:</strong> Send manual event-specific follow-up email</li>
+<li><strong>Tag Applied:</strong> "Attended: [Event Name] - [Date]"</li>
+</ul>
 
-            const fetchAllData = async () => {
-                setLoading(true);
-                setError(null);
-                
-                try {
-                    // Fetch all data in parallel
-                    const [mailchimpRes, bitlyRes, ticketTailorRes] = await Promise.allSettled([
-                        callAPI('mailchimp', { action: 'getLeadStats', weeks: 12 }),
-                        callAPI('bitly', { action: 'getRecruitmentLinks', days: 30 }),
-                        callAPI('ticket-tailor', { action: 'getEvents' })
-                    ]);
+<h4>Automated Step (Mailchimp):</h4>
+<ul>
+<li><strong>Trigger:</strong> Tag added "Attended: [Event Name]"</li>
+<li><strong>Condition:</strong> Does NOT have "Applicant:" tag</li>
+<li><strong>Action:</strong>
+<ul>
+<li>IF contact is NOT already in Shared Nurture Sequence → Add to sequence at Day 0</li>
+<li>IF contact IS already in Shared Nurture Sequence → Continue from current position</li>
+</ul>
+</li>
+<li><strong>Note:</strong> Contact receives manual email regardless of sequence status</li>
+</ul>
 
-                    if (mailchimpRes.status === 'fulfilled') {
-                        setLeadStats(mailchimpRes.value);
-                    } else {
-                        console.error('Mailchimp error:', mailchimpRes.reason);
-                    }
+<h3>Workflow 2: Shared Nurture Sequence (EOI Forms + Landing Pages + Event Attendees)</h3>
 
-                    if (bitlyRes.status === 'fulfilled') {
-                        setBitlyData(bitlyRes.value);
-                    } else {
-                        console.error('Bitly error:', bitlyRes.reason);
-                    }
+<h4>Entry Triggers:</h4>
+<ul>
+<li>Tag added "Source: EOI - [Course Name]", OR</li>
+<li>Tag added "Source: Landing Page - [Campaign]", OR</li>
+<li>Tag added "Attended: [Event Name]" (after manual follow-up)</li>
+</ul>
 
-                    if (ticketTailorRes.status === 'fulfilled') {
-                        setEventsData(ticketTailorRes.value);
-                    } else {
-                        console.error('Ticket Tailor error:', ticketTailorRes.reason);
-                    }
+<h4>Conditions:</h4>
+<ul>
+<li>Does NOT have "Applicant:" tag</li>
+<li>Has NOT already completed this sequence</li>
+</ul>
 
-                    setLastUpdated(new Date());
-                } catch (err) {
-                    setError('Failed to load dashboard data. Check your API configuration.');
-                    console.error(err);
-                } finally {
-                    setLoading(false);
-                }
-            };
+<h4>Email Sequence:</h4>
 
-            useEffect(() => {
-                fetchAllData();
-            }, []);
+<p><strong>Day 0: Application Encouragement</strong></p>
+<ul>
+<li>Why now is the right time to apply</li>
+<li>Simple application process overview</li>
+<li>Quick wins: "Apply in under 30 minutes"</li>
+</ul>
 
-            useEffect(() => {
-                if (autoRefresh) {
-                    const interval = setInterval(fetchAllData, 30000);
-                    return () => clearInterval(interval);
-                }
-            }, [autoRefresh]);
+<p><strong>Day 3: Open Events Promotion</strong></p>
+<ul>
+<li>Upcoming campus visits/virtual events</li>
+<li>Meet our academics and current students</li>
+<li>Register links</li>
+</ul>
 
-            return (
-                <div className="min-h-screen p-6">
-                    <div className="max-w-7xl mx-auto">
-                        {/* Header */}
-                        <div className="mb-6 flex justify-between items-center">
-                            <div>
-                                <h1 className="text-4xl font-bold text-gray-900">
-                                    <i className="fas fa-graduation-cap mr-3 text-blue-600"></i>
-                                    Student Recruitment Dashboard
-                                </h1>
-                                <p className="text-gray-600 mt-2">
-                                    Academic Year {new Date().getMonth() >= 8 ? new Date().getFullYear() : new Date().getFullYear() - 1}/{new Date().getMonth() >= 8 ? new Date().getFullYear() + 1 : new Date().getFullYear()}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="autoRefresh"
-                                        checked={autoRefresh}
-                                        onChange={(e) => setAutoRefresh(e.target.checked)}
-                                        className="w-4 h-4"
-                                    />
-                                    <label htmlFor="autoRefresh" className="text-sm font-medium text-gray-700">
-                                        Auto-refresh (30s)
-                                    </label>
-                                </div>
-                                <button
-                                    onClick={fetchAllData}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center gap-2"
-                                >
-                                    <i className="fas fa-sync-alt"></i> Refresh
-                                </button>
-                            </div>
-                        </div>
+<p><strong>Day 7: Student Stories</strong></p>
+<ul>
+<li>Current student testimonials</li>
+<li>Day-in-the-life content</li>
+<li>Career outcomes</li>
+</ul>
 
-                        {/* Error Message */}
-                        {error && (
-                            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-                                <div className="flex">
-                                    <i className="fas fa-exclamation-circle text-red-500 mt-0.5 mr-3"></i>
-                                    <p className="text-red-700">{error}</p>
-                                </div>
-                            </div>
-                        )}
+<p><strong>Day 14: Application Deadlines</strong></p>
+<ul>
+<li>Key dates for their year of entry</li>
+<li>What happens after the deadline</li>
+<li>Priority/early bird benefits (if applicable)</li>
+</ul>
 
-                        {/* Last Updated */}
-                        {lastUpdated && (
-                            <div className="text-right text-sm text-gray-500 mb-4">
-                                Last updated: {lastUpdated.toLocaleString()}
-                            </div>
-                        )}
+<p><strong>Day 21: Scholarship Information</strong></p>
+<ul>
+<li>Available funding options</li>
+<li>How to apply for scholarships</li>
+<li>Success stories from scholarship recipients</li>
+</ul>
 
-                        {/* KPI Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                            <KPICard
-                                title="Total Leads"
-                                value={leadStats?.leads?.toLocaleString() || '0'}
-                                change={leadStats?.weeklyChange}
-                                icon="fas fa-users"
-                                color="bg-blue-600"
-                                loading={loading}
-                                subtitle={`${leadStats?.thisWeekSubscribed || 0} new this week`}
-                            />
-                            <KPICard
-                                title="Applicants"
-                                value={leadStats?.applicants?.toLocaleString() || '0'}
-                                change={null}
-                                icon="fas fa-user-graduate"
-                                color="bg-green-600"
-                                loading={loading}
-                                subtitle={`${leadStats?.conversionRate || 0}% conversion rate`}
-                            />
-                            <KPICard
-                                title="Link Clicks (30d)"
-                                value={bitlyData?.totalClicks?.toLocaleString() || '0'}
-                                change={null}
-                                icon="fas fa-mouse-pointer"
-                                color="bg-purple-600"
-                                loading={loading}
-                                subtitle={`${bitlyData?.totalLinks || 0} active links`}
-                            />
-                            <KPICard
-                                title="Upcoming Events"
-                                value={eventsData?.upcomingEvents?.length || '0'}
-                                change={null}
-                                icon="fas fa-calendar-check"
-                                color="bg-orange-600"
-                                loading={loading}
-                                subtitle={`${eventsData?.summary?.totalSold || 0} people attending`}
-                            />
-                        </div>
+<p><strong>Day 30: Reputational Communications</strong></p>
+<ul>
+<li>Rankings and accreditations</li>
+<li>Industry partnerships</li>
+<li>Graduate employment statistics</li>
+<li>Final application encouragement</li>
+</ul>
 
-                        {/* Main Charts */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <div className="bg-white p-6 rounded-lg shadow-md">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                                    <i className="fas fa-chart-line mr-2"></i>Link Clicks by Week
-                                </h3>
-                                {loading ? (
-                                    <div className="animate-pulse" style={{ height: '300px' }}>
-                                        <div className="h-full bg-gray-200 rounded"></div>
-                                    </div>
-                                ) : bitlyData ? (
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                                            <div>
-                                                <p className="text-sm text-gray-600">Total Clicks (30 days)</p>
-                                                <p className="text-3xl font-bold text-blue-600">{bitlyData.totalClicks?.toLocaleString()}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-sm text-gray-600">Active Links</p>
-                                                <p className="text-2xl font-bold text-gray-800">{bitlyData.totalLinks}</p>
-                                            </div>
-                                        </div>
-                                        <div className="border-t pt-4">
-                                            <p className="text-sm text-gray-500 italic">
-                                                <i className="fas fa-info-circle mr-2"></i>
-                                                Weekly breakdown requires Bitly API upgrade. Contact admin to enable detailed analytics.
-                                            </p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <p className="text-xs font-semibold text-gray-600 uppercase">Top Performing Links</p>
-                                            {bitlyData.links?.slice(0, 5).map((link, i) => (
-                                                <div key={i} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
-                                                    <span className="text-sm text-gray-700 truncate max-w-md">{link.title || link.id}</span>
-                                                    <span className="text-sm font-semibold text-blue-600">{link.clicks} clicks</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-500">No link data available</p>
-                                )}
-                            </div>
-                            <ChartComponent
-                                title="Traffic Sources (Top Referrers)"
-                                type="bar"
-                                data={bitlyData?.topReferrers?.map(r => r.clicks) || []}
-                                labels={bitlyData?.topReferrers?.map(r => r.referrer) || []}
-                                loading={loading}
-                            />
-                        </div>
+<p><strong>Workflow ends:</strong> When person is tagged as "Applicant: [Year]" or completes Day 30 email</p>
 
-                        {/* Geographic Distribution */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <div className="bg-white p-6 rounded-lg shadow-md">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                                    <i className="fas fa-globe mr-2"></i>Geographic Distribution
-                                </h3>
-                                {loading ? (
-                                    <div className="animate-pulse space-y-3">
-                                        {[1,2,3,4,5].map(i => (
-                                            <div key={i} className="h-8 bg-gray-200 rounded"></div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {bitlyData?.topCountries?.map((country, index) => (
-                                            <div key={index} className="flex items-center justify-between">
-                                                <span className="font-medium text-gray-700">{country.country}</span>
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                                                        <div
-                                                            className="bg-blue-600 h-2 rounded-full"
-                                                            style={{ width: `${country.percentage}%` }}
-                                                        ></div>
-                                                    </div>
-                                                    <span className="font-semibold text-gray-800 w-16 text-right">
-                                                        {country.percentage}%
-                                                    </span>
-                                                    <span className="text-gray-600 w-16 text-right text-sm">
-                                                        {country.clicks.toLocaleString()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+<h3>Workflow 3: FindAMasters Welcome (CRITICAL - GDPR Compliant)</h3>
 
-                            <div className="bg-white p-6 rounded-lg shadow-md">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                                    <i className="fas fa-chart-pie mr-2"></i>Event Summary
-                                </h3>
-                                {loading ? (
-                                    <div className="animate-pulse space-y-4">
-                                        {[1,2,3].map(i => (
-                                            <div key={i} className="h-12 bg-gray-200 rounded"></div>
-                                        ))}
-                                    </div>
-                                ) : eventsData?.summary ? (
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-                                            <span className="text-gray-700 font-medium">Total Events</span>
-                                            <span className="text-2xl font-bold text-blue-600">{eventsData.summary.totalEvents}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
-                                            <span className="text-gray-700 font-medium">People Attending</span>
-                                            <span className="text-2xl font-bold text-purple-600">{eventsData.summary.totalSold}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-                                            <span className="text-gray-700 font-medium">Attendance Rate</span>
-                                            <span className="text-2xl font-bold text-yellow-600">{eventsData.summary.attendanceRate}%</span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-500">No event data available</p>
-                                )}
-                            </div>
-                        </div>
+<ul>
+<li><strong>Trigger:</strong> Tag added "Source: FindAMasters"</li>
+<li><strong>Condition:</strong> Does NOT have "Applicant:" tag</li>
+</ul>
 
-                        {/* Events Table */}
-                        <div className="mb-6">
-                            <EventsTable events={eventsData?.upcomingEvents} loading={loading} />
-                        </div>
+<h4>Email Sequence:</h4>
 
-                        {/* Links Table */}
-                        <div className="mb-6">
-                            <LinksTable links={bitlyData?.links} loading={loading} />
-                        </div>
+<p><strong>Day 0: SPECIAL FIRST EMAIL</strong></p>
+<ul>
+<li>Subject: "Your enquiry via FindAMasters about [Course]"</li>
+<li>Acknowledge FindAMasters as source</li>
+<li>Link to privacy notice</li>
+<li>Explain what happens next</li>
+<li>Very clear unsubscribe option</li>
+</ul>
 
-                        {/* Footer */}
-                        <div className="mt-8 text-center text-gray-500 text-sm border-t pt-6">
-                            <p>Student Recruitment Dashboard • Academic Year 2024/25</p>
-                            <p className="mt-1">Recruitment Period: October - August</p>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
+<p><strong>Day 3: Course information (if they haven't unsubscribed)</strong></p>
+<ul>
+<li>Specific details about their programme of interest</li>
+<li>Entry requirements</li>
+<li>Key differentiators</li>
+</ul>
 
-        ReactDOM.render(<Dashboard />, document.getElementById('root'));
-    </script>
+<p><strong>Day 7: Application process</strong></p>
+<ul>
+<li>Step-by-step guide</li>
+<li>Required documents</li>
+<li>Timeline</li>
+</ul>
+
+<p><strong>Day 14: Deadline reminder</strong></p>
+<ul>
+<li>Key dates</li>
+<li>Final encouragement</li>
+<li>Contact details for questions</li>
+</ul>
+
+<div class="warning-box">
+<p><strong>Special rule:</strong> If no email opens after 30 days → Stop workflow + Flag for review</p>
+</div>
+
+<h3>Workflow 4: Website Contact Form Follow-Up</h3>
+
+<ul>
+<li><strong>Trigger:</strong> Tag added "Source: Website Contact Form"</li>
+<li><strong>Condition:</strong> Does NOT have "Applicant:" tag</li>
+</ul>
+
+<h4>Email Sequence:</h4>
+
+<p><strong>Day 0: Enquiry response + opt-in confirmation</strong></p>
+<ul>
+<li>Direct response to their enquiry</li>
+<li>"You also opted in for updates about our courses"</li>
+<li>What to expect</li>
+</ul>
+
+<p><strong>Day 3: Course discovery guide</strong></p>
+<ul>
+<li>Overview of programmes</li>
+<li>Find the right course tool/quiz</li>
+<li>Subject area exploration</li>
+</ul>
+
+<p><strong>Day 7: Event invitation</strong></p>
+<ul>
+<li>Upcoming open days</li>
+<li>Virtual information sessions</li>
+<li>Subject-specific events</li>
+</ul>
+
+<p><strong>Day 14: Application information</strong></p>
+<ul>
+<li>How to apply</li>
+<li>Entry requirements overview</li>
+<li>Next steps</li>
+</ul>
+
+<h2>Applicant Journey Workflow (Admissions owned)</h2>
+
+<h3>Workflow 5: Applicant Nurture (All Sources)</h3>
+
+<ul>
+<li><strong>Trigger:</strong> Tag added starting with "Applicant:"</li>
+<li><strong>Stop condition:</strong> Tag added "Student:" OR 60 days elapsed</li>
+</ul>
+
+<h4>Email Sequence:</h4>
+
+<p><strong>Day 0: "Application Received - What Happens Next"</strong></p>
+<ul>
+<li>Confirm receipt</li>
+<li>Timeline</li>
+<li>What to expect</li>
+</ul>
+
+<p><strong>Day 7: "Scholarships" (if applicable)</strong></p>
+<ul>
+<li>Tips and guidance</li>
+<li>What we look for</li>
+</ul>
+
+<p><strong>Day 14: "Meet Our Current Students"</strong></p>
+<ul>
+<li>Testimonials</li>
+<li>Day in the life</li>
+</ul>
+
+<p><strong>Day 21: "Key Dates Reminder"</strong></p>
+<ul>
+<li>Decision timeline</li>
+<li>Funding deadlines</li>
+</ul>
+
+<p><strong>Day 30: "Still Have Questions?"</strong></p>
+<ul>
+<li>FAQ</li>
+<li>Contact details</li>
+</ul>
+
+<div class="info-box">
+<p><strong>Important:</strong> Source tags are RETAINED when applicant tag is added, so you can:</p>
+<ul>
+<li>Report on conversion by source</li>
+<li>Understand which acquisition channels lead to applications</li>
+<li>Tailor applicant journey if needed (e.g., event attendees vs. cold leads)</li>
+</ul>
+</div>
+
+<h2>Detailed Process Steps</h2>
+
+<h3>Stage 1: Marketing Lead (Current Process)</h3>
+
+<p><strong>Who they are:</strong></p>
+<ul>
+<li>Registered for events</li>
+<li>Expressed interest in courses</li>
+<li>Consented to marketing emails</li>
+</ul>
+
+<p><strong>Tags they have:</strong></p>
+<ul>
+<li>Registered: [Event Name]</li>
+<li>Attended: [Event Name]</li>
+<li>Source: [Origin]</li>
+</ul>
+
+<p><strong>What they receive:</strong></p>
+<ul>
+<li>Event-specific follow-up (manual, if attended event)</li>
+<li>Shared 6-email nurture sequence OR</li>
+<li>FindAMasters-specific sequence OR</li>
+<li>Website Contact Form sequence</li>
+</ul>
+
+<p><strong>Goal:</strong> Encourage them to submit an application</p>
+
+<h3>Stage 2: Application Submitted (Trigger Point)</h3>
+
+<p><strong>What happens:</strong></p>
+<ul>
+<li>Person submits application through your system</li>
+<li>Application is logged in SIS</li>
+<li>Data includes: Email, Name, Year of Entry, Application Date</li>
+</ul>
+
+<div class="highlight-box">
+<p><strong>Important:</strong> There will be a gap between application submission and Mailchimp update:</p>
+<ul>
+<li>Maximum 3-4 days (if they apply just after an import)</li>
+<li>They may receive 1-2 marketing emails after applying</li>
+<li><strong>Mitigation:</strong> Include line in marketing emails: "Already applied? Please ignore this email and await communication from our Admissions team."</li>
+</ul>
+</div>
+
+<h3>Stage 3: Weekly SIS Export & Mailchimp Import</h3>
+
+<h4>Schedule:</h4>
+<p><strong>Monday morning</strong> (9:00 AM) - Captures weekend + Mon/Tue/Wed applications</p>
+
+<h4>Export from SIS:</h4>
+<p><strong>Required data:</strong> Email Address, Year of Entry</p>
+
+<p><strong>Export criteria:</strong></p>
+<ul>
+<li>All applications submitted since last export</li>
+<li>Status: "Application Submitted" or equivalent</li>
+<li>Include: Email address + Year of Entry only</li>
+</ul>
+
+<h4>Import to Mailchimp:</h4>
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Save SIS export as CSV</li>
+<li>Open Mailchimp → Audience → Import contacts</li>
+<li>Upload CSV file</li>
+<li>Settings:
+<ul>
+<li>"Update existing contacts" = ON</li>
+<li>Status: Keep existing status</li>
+</ul>
+</li>
+<li>Map fields:
+<ul>
+<li>Email Address → Email Address</li>
+<li>Year of Entry → Year of Entry (optional - for reference)</li>
+</ul>
+</li>
+<li>Add tag based on year:
+<ul>
+<li>If Year = 2026 → Tag: Applicant: 2026</li>
+<li>If Year = 2027 → Tag: Applicant: 2027</li>
+<li>If Year = 2028 → Tag: Applicant: 2028</li>
+</ul>
+</li>
+<li>Import</li>
+</ol>
+
+<div class="info-box">
+<p><strong>Note:</strong> You may need to import 3 separate files (one per year) to apply the correct year-specific tag, OR use Mailchimp's conditional tagging if available.</p>
+</div>
+
+<h3>Stage 4: Workflow Exclusion</h3>
+
+<p>Once tagged as applicant, they are automatically excluded from marketing workflows and enter the Applicant Journey workflow.</p>
+
+<h4>Exclusion + Applicant Journey Workflow (Admissions owned)</h4>
+
+<p><strong>Setup:</strong></p>
+<ol>
+<li>Marketing workflows automatically stop (due to "Does NOT have Applicant:" condition)</li>
+<li>Applicant Journey workflow begins</li>
+</ol>
+
+<p><strong>Trigger:</strong> Tag added Applicant: 2026 (create 3 versions for each year)</p>
+
+<p><strong>Email sequence:</strong></p>
+
+<p><strong>a. Day 0 (Immediate): "Application Received - What Happens Next"</strong></p>
+<ul>
+<li>Confirm application received</li>
+<li>Outline timeline</li>
+<li>What to expect</li>
+</ul>
+
+<p><strong>b. Day 7: "Scholarship information" (if applicable)</strong></p>
+<ul>
+<li>Tips</li>
+<li>What we look for</li>
+<li>Common questions</li>
+</ul>
+
+<p><strong>c. Day 14: "Meet Our Current Students"</strong></p>
+<ul>
+<li>Student testimonials</li>
+<li>Day-in-the-life content</li>
+<li>Course highlights</li>
+</ul>
+
+<p><strong>d. Day 21: "Key Dates Reminder"</strong></p>
+<ul>
+<li>Decision timeline</li>
+<li>Funding deadlines</li>
+<li>What to do while waiting</li>
+</ul>
+
+<p><strong>e. Day 30: "Still Have Questions?"</strong></p>
+<ul>
+<li>FAQ link</li>
+<li>Contact details</li>
+<li>Webinar invitation (if applicable)</li>
+</ul>
+
+<p><strong>Workflow ends:</strong> When person is tagged as Student: [Year] or after 60 days</p>
+
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Keeps applicants engaged</li>
+<li>Automated nurture reduces Admissions workload</li>
+<li>Consistent experience for all applicants</li>
+<li>Positions institution positively</li>
+</ul>
+
+<p><strong>Cons:</strong></p>
+<ul>
+<li>More setup work initially</li>
+<li>Risk of message conflicts with Admissions</li>
+<li>Requires content creation</li>
+<li>Needs coordination with Admissions team</li>
+</ul>
+
+<h3>Stage 5: Enrolment & Data Management</h3>
+
+<h4>When Student Enrols:</h4>
+
+<p><strong>Bi-annual process (October and February):</strong></p>
+
+<ol>
+<li><strong>Export from SIS:</strong>
+<ul>
+<li>All students who have accepted offers/enrolled</li>
+<li>Email addresses only</li>
+</ul>
+</li>
+<li><strong>Import to Mailchimp:</strong>
+<ul>
+<li>Add tag: Student: 2026 (or relevant year)</li>
+<li>This flags them for deletion</li>
+</ul>
+</li>
+<li><strong>Bi-annual deletion process:</strong>
+<ul>
+<li>Create segment: Has any tag starting with "Student:"</li>
+<li>Export segment for records (save to your archive)</li>
+<li>Bulk delete from Mailchimp</li>
+<li>Reason: They've fulfilled the purpose of marketing consent (became a student)</li>
+<li>Student Experience team manages all further communications via their system</li>
+</ul>
+</li>
+</ol>
+
+<div class="info-box">
+<p><strong>Important notes:</strong></p>
+<ul>
+<li>Marketing consent was for recruitment purposes</li>
+<li>Student communications handled by separate system/team</li>
+<li>Alumni managed through different audience/process</li>
+<li>Deletion complies with data minimisation principle (GDPR)</li>
+</ul>
+</div>
+
+<h4>If Application Rejected/Withdrawn:</h4>
+
+<p><strong>Decision needed:</strong> Do we:</p>
+<ul>
+<li><strong>Option 1:</strong> Remove Applicant: tag, return to marketing pool for future intakes?</li>
+<li><strong>Option 2:</strong> Keep tag, exclude permanently (they already applied once)?</li>
+<li><strong>Option 3:</strong> Add tag Previous Applicant, create special re-engagement workflow?</li>
+</ul>
+
+<p><strong>Recommendation:</strong> Discuss with Admissions team. May vary by reason (rejected vs. withdrew).</p>
+
+<h2>Tag Architecture Summary</h2>
+
+<div class="workflow-tree">Marketing Stage:
+    Source: EOI - [Course Name]
+    Source: Landing Page - [Campaign]
+    Source: FindAMasters
+    Source: Website Contact Form
+    Registered: [Event Name] - [Date]
+    Attended: [Event Name] - [Date]
+    (Multiple tags can accumulate)
+
+Applicant Stage:
+    Applicant: 2026
+    Applicant: 2027
+    Applicant: 2028
+    (Only ONE applicant tag per person)
+
+Student Stage (for deletion):
+    Student: 2026
+    Student: 2027
+    Student: 2028
+    (Flags for removal from Mailchimp)</div>
+
+<h2>Workflow Exclusion Rules</h2>
+
+<h3>Marketing Workflows:</h3>
+<p><strong>Condition:</strong> Send to contacts who do NOT have any tags starting with "Applicant:" AND do NOT have any tags starting with "Student:"</p>
+
+<h3>Applicant Journey Workflow:</h3>
+<p><strong>Trigger:</strong> Tag added starting with "Applicant:"</p>
+<p><strong>Stop condition:</strong> Tag added starting with "Student:" OR 60 days elapsed</p>
+
+<div class="page-break"></div>
+
+<h2>Monday Morning Import Checklist</h2>
+
+<p><strong>Frequency:</strong> Monday AM</p>
+
+<h3>Step 1: Export from SIS</h3>
+<ul class="checkbox-list">
+<li>Log into SIS</li>
+<li>Run report: "Applications Since Last Import"</li>
+<li>Date range: Since last Monday's import</li>
+<li>Export fields: Email Address, Year of Entry</li>
+<li>Save as: SIS_Applicants_[Date].csv</li>
+</ul>
+
+<h3>Step 2: Prepare Import File</h3>
+<ul class="checkbox-list">
+<li>Open CSV in Excel/Google Sheets</li>
+<li>Check for duplicates (remove if any)</li>
+<li>Verify email addresses are valid format</li>
+<li>Confirm Year of Entry values are 2026, 2027, or 2028</li>
+<li>Count rows (note number of new applicants)</li>
+</ul>
+
+<h3>Step 3: Import to Mailchimp - 2026 Applicants</h3>
+<ul class="checkbox-list">
+<li>Filter CSV for Year of Entry = 2026</li>
+<li>Save as: MC_Import_2026_[Date].csv</li>
+<li>Go to Mailchimp → Audience → Import contacts</li>
+<li>Upload file</li>
+<li>Settings: "Update existing contacts" = ON</li>
+<li>Map: Email Address → Email Address</li>
+<li>Add tag: Applicant: 2026</li>
+<li>Import</li>
+<li>Note import summary (X contacts imported/updated)</li>
+</ul>
+
+<h3>Step 4: Import to Mailchimp - 2027 Applicants</h3>
+<ul class="checkbox-list">
+<li>Filter CSV for Year of Entry = 2027</li>
+<li>Save as: MC_Import_2027_[Date].csv</li>
+<li>Repeat import process</li>
+<li>Add tag: Applicant: 2027</li>
+<li>Import</li>
+<li>Note import summary</li>
+</ul>
+
+<h3>Step 5: Import to Mailchimp - 2028 Applicants</h3>
+<ul class="checkbox-list">
+<li>Filter CSV for Year of Entry = 2028</li>
+<li>Save as: MC_Import_2028_[Date].csv</li>
+<li>Repeat import process</li>
+<li>Add tag: Applicant: 2028</li>
+<li>Import</li>
+<li>Note import summary</li>
+</ul>
+
+<h3>Step 6: Verification</h3>
+<ul class="checkbox-list">
+<li>Go to Audience → Tags</li>
+<li>Check count for Applicant: 2026 (should have increased)</li>
+<li>Check count for Applicant: 2027 (should have increased)</li>
+<li>Check count for Applicant: 2028 (should have increased)</li>
+<li>Spot check: Search for 2-3 email addresses to confirm tags applied</li>
+<li>Verify source tags still present (not overwritten)</li>
+</ul>
+
+<h3>Step 7: Source Performance Check (Weekly on Mondays)</h3>
+<ul class="checkbox-list">
+<li>Export applicants from this week (has Applicant tag + this week's date)</li>
+<li>Count by source tag:
+<ul>
+<li>How many from Events?</li>
+<li>How many from EOI Forms?</li>
+<li>How many from Landing Pages?</li>
+<li>How many from FindAMasters?</li>
+<li>How many from Contact Forms?</li>
+</ul>
+</li>
+<li>Update Sheet 2: Source Performance Tracking</li>
+<li>Note any anomalies (e.g., spike from one source)</li>
+</ul>
+
+<h3>Step 8: Record Keeping</h3>
+<ul class="checkbox-list">
+<li>Update tracking spreadsheet Sheet 1 (Weekly Import Log):
+<ul>
+<li>Date of import</li>
+<li>Number of new 2026 applicants</li>
+<li>Number of new 2027 applicants</li>
+<li>Number of new 2028 applicants</li>
+<li>Number of students deleted</li>
+<li>Any issues/notes</li>
+</ul>
+</li>
+<li>Update Sheet 2 (Source Performance) if Monday</li>
+<li>Update Sheet 3 (Source Conversion) if end of month</li>
+<li>File all CSV exports in archive folder</li>
+</ul>
+
+<h3>Step 9: Error Handling</h3>
+<ul class="checkbox-list">
+<li>Review any import errors from Mailchimp</li>
+<li>Common issues:
+<ul>
+<li>Invalid email format → Fix in SIS, re-export</li>
+<li>Email doesn't exist in Mailchimp → Expected for direct applicants who never attended events (they'll be added)</li>
+<li>Duplicate emails → Check if person applied for multiple years</li>
+</ul>
+</li>
+<li>Document any issues in tracking spreadsheet</li>
+</ul>
+
+<h2>Tracking Spreadsheet Template</h2>
+
+<p>Create a Google Sheet or Excel file with these sheets:</p>
+
+<h3>Sheet 1: Weekly Import Log</h3>
+
+<table>
+<thead>
+<tr>
+<th>Import Date</th>
+<th>Day</th>
+<th>2026 Apps</th>
+<th>2027 Apps</th>
+<th>2028 Apps</th>
+<th>Total Apps</th>
+<th>Students Deleted</th>
+<th>Total in MC</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>06/01/2025</td>
+<td>Mon</td>
+<td>12</td>
+<td>8</td>
+<td>3</td>
+<td>23</td>
+<td>5</td>
+<td>2,847</td>
+<td>-</td>
+</tr>
+<tr>
+<td>09/01/2025</td>
+<td>Thu</td>
+<td>7</td>
+<td>4</td>
+<td>2</td>
+<td>13</td>
+<td>-</td>
+<td>2,860</td>
+<td>-</td>
+</tr>
+<tr>
+<td>13/01/2025</td>
+<td>Mon</td>
+<td>15</td>
+<td>11</td>
+<td>5</td>
+<td>31</td>
+<td>8</td>
+<td>2,883</td>
+<td>Peak season</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Sheet 2: Source Performance Tracking</h3>
+
+<table>
+<thead>
+<tr>
+<th>Month</th>
+<th>Events</th>
+<th>EOI Forms</th>
+<th>Landing Pages</th>
+<th>FindAMasters</th>
+<th>Contact Forms</th>
+<th>Total Leads</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Jan 25</td>
+<td>45</td>
+<td>78</td>
+<td>23</td>
+<td>34</td>
+<td>12</td>
+<td>192</td>
+</tr>
+<tr>
+<td>Feb 25</td>
+<td>52</td>
+<td>82</td>
+<td>28</td>
+<td>41</td>
+<td>15</td>
+<td>218</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Sheet 3: Source Conversion Tracking</h3>
+
+<table>
+<thead>
+<tr>
+<th>Source Type</th>
+<th>Total Leads (Last 12mo)</th>
+<th>Applied</th>
+<th>Applied %</th>
+<th>Enrolled</th>
+<th>Enrolled %</th>
+<th>ROI Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Events</td>
+<td>450</td>
+<td>67</td>
+<td>14.9%</td>
+<td>23</td>
+<td>5.1%</td>
+<td>High quality</td>
+</tr>
+<tr>
+<td>EOI Forms</td>
+<td>823</td>
+<td>98</td>
+<td>11.9%</td>
+<td>34</td>
+<td>4.1%</td>
+<td>Volume driver</td>
+</tr>
+<tr>
+<td>Landing Pages</td>
+<td>234</td>
+<td>28</td>
+<td>12.0%</td>
+<td>9</td>
+<td>3.8%</td>
+<td>Campaign dependent</td>
+</tr>
+<tr>
+<td>FindAMasters</td>
+<td>378</td>
+<td>31</td>
+<td>8.2%</td>
+<td>8</td>
+<td>2.1%</td>
+<td>Lower conversion</td>
+</tr>
+<tr>
+<td>Contact Forms</td>
+<td>145</td>
+<td>15</td>
+<td>10.3%</td>
+<td>5</td>
+<td>3.4%</td>
+<td>General interest</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Purpose:</strong></p>
+<ul>
+<li>Track volume by source</li>
+<li>Identify best-performing channels</li>
+<li>Calculate ROI by acquisition source</li>
+<li>Inform budget allocation decisions</li>
+<li>Spot trends and anomalies</li>
+</ul>
+
+<h3>Sheet 4: FindAMasters Audit Log</h3>
+
+<table>
+<thead>
+<tr>
+<th>Import Date</th>
+<th>Leads Imported</th>
+<th>30-Day Engagement Rate</th>
+<th>Unsubscribe Rate</th>
+<th>Issues</th>
+<th>Action Taken</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>06/01/2025</td>
+<td>12</td>
+<td>58%</td>
+<td>8%</td>
+<td>Higher unsub than other sources</td>
+<td>Reviewed first email, added clearer context</td>
+</tr>
+<tr>
+<td>13/01/2025</td>
+<td>15</td>
+<td>67%</td>
+<td>5%</td>
+<td>-</td>
+<td>Improved</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Purpose:</strong> Monitor FindAMasters compliance and quality</p>
+
 </body>
 </html>
