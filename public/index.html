@@ -520,54 +520,66 @@
                 <div className="min-h-screen p-6">
                     <div className="max-w-7xl mx-auto">
                         {/* Header */}
-                        <div className="mb-6 flex justify-between items-center">
-                            <div>
-                                <h1 className="text-4xl font-bold text-gray-900">
-                                    <i className="fas fa-graduation-cap mr-3 text-blue-600"></i>
-                                    Student Recruitment Dashboard
-                                </h1>
-                                <p className="text-gray-600 mt-2">
-                                    Academic Year {new Date().getMonth() >= 8 ? new Date().getFullYear() : new Date().getFullYear() - 1}/{new Date().getMonth() >= 8 ? new Date().getFullYear() + 1 : new Date().getFullYear()}
+                        <div className="mb-8">
+                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                                <div>
+                                    <h1 className="text-4xl font-bold text-gray-900">
+                                        <i className="fas fa-graduation-cap mr-3 text-blue-600"></i>
+                                        Student Recruitment Dashboard
+                                    </h1>
+                                    <p className="text-gray-600 mt-2">
+                                        Academic Year {new Date().getMonth() >= 8 ? new Date().getFullYear() : new Date().getFullYear() - 1}/{new Date().getMonth() >= 8 ? new Date().getFullYear() + 1 : new Date().getFullYear()}
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    {/* Date Range Selector */}
+                                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
+                                        <i className="fas fa-calendar-alt text-blue-600"></i>
+                                        <select
+                                            value={dateRange}
+                                            onChange={(e) => {
+                                                setDateRange(parseInt(e.target.value));
+                                                setTimeout(fetchAllData, 100);
+                                            }}
+                                            className="border-0 bg-transparent font-medium text-gray-700 focus:outline-none cursor-pointer"
+                                        >
+                                            <option value={7}>Last 7 days</option>
+                                            <option value={14}>Last 14 days</option>
+                                            <option value={30}>Last 30 days</option>
+                                            <option value={60}>Last 60 days</option>
+                                            <option value={90}>Last 90 days</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Export CSV Button */}
+                                    <button
+                                        onClick={exportToCSV}
+                                        disabled={loading}
+                                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 shadow-sm"
+                                        title="Export data as CSV"
+                                    >
+                                        <i className="fas fa-file-csv mr-2"></i>
+                                        Export CSV
+                                    </button>
+
+                                    {/* Refresh Button */}
+                                    <button
+                                        onClick={fetchAllData}
+                                        disabled={loading}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 shadow-sm"
+                                    >
+                                        <i className="fas fa-sync-alt mr-2"></i>
+                                        Refresh
+                                    </button>
+                                </div>
+                            </div>
+                            {lastUpdated && (
+                                <p className="text-sm text-gray-500">
+                                    <i className="fas fa-clock mr-1"></i>
+                                    Last updated: {lastUpdated.toLocaleTimeString()} • Showing data for last {dateRange} days
                                 </p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="autoRefresh"
-                                        checked={autoRefresh}
-                                        onChange={(e) => setAutoRefresh(e.target.checked)}
-                                        className="w-4 h-4"
-                                    />
-                                    <label htmlFor="autoRefresh" className="text-sm font-medium text-gray-700">
-                                        Auto-refresh (30s)
-                                    </label>
-                                </div>
-                                <button
-                                    onClick={fetchAllData}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center gap-2"
-                                >
-                                    <i className="fas fa-sync-alt"></i> Refresh
-                                </button>
-                            </div>
+                            )}
                         </div>
-
-                        {/* Error Message */}
-                        {error && (
-                            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-                                <div className="flex">
-                                    <i className="fas fa-exclamation-circle text-red-500 mt-0.5 mr-3"></i>
-                                    <p className="text-red-700">{error}</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Last Updated */}
-                        {lastUpdated && (
-                            <div className="text-right text-sm text-gray-500 mb-4">
-                                Last updated: {lastUpdated.toLocaleString()}
-                            </div>
-                        )}
 
                         {/* KPI Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
