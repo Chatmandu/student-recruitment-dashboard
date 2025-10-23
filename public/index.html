@@ -17,6 +17,77 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // Country code to full name mapping
+        const countryNames = {
+            'US': 'United States',
+            'GB': 'United Kingdom',
+            'CA': 'Canada',
+            'AU': 'Australia',
+            'DE': 'Germany',
+            'FR': 'France',
+            'NL': 'Netherlands',
+            'ES': 'Spain',
+            'IT': 'Italy',
+            'SE': 'Sweden',
+            'NO': 'Norway',
+            'DK': 'Denmark',
+            'FI': 'Finland',
+            'IE': 'Ireland',
+            'BE': 'Belgium',
+            'AT': 'Austria',
+            'CH': 'Switzerland',
+            'PL': 'Poland',
+            'CZ': 'Czech Republic',
+            'PT': 'Portugal',
+            'GR': 'Greece',
+            'RO': 'Romania',
+            'HU': 'Hungary',
+            'BG': 'Bulgaria',
+            'HR': 'Croatia',
+            'SK': 'Slovakia',
+            'SI': 'Slovenia',
+            'EE': 'Estonia',
+            'LV': 'Latvia',
+            'LT': 'Lithuania',
+            'CY': 'Cyprus',
+            'MT': 'Malta',
+            'LU': 'Luxembourg',
+            'JP': 'Japan',
+            'CN': 'China',
+            'IN': 'India',
+            'KR': 'South Korea',
+            'SG': 'Singapore',
+            'HK': 'Hong Kong',
+            'MY': 'Malaysia',
+            'TH': 'Thailand',
+            'ID': 'Indonesia',
+            'PH': 'Philippines',
+            'VN': 'Vietnam',
+            'NZ': 'New Zealand',
+            'BR': 'Brazil',
+            'MX': 'Mexico',
+            'AR': 'Argentina',
+            'CL': 'Chile',
+            'CO': 'Colombia',
+            'PE': 'Peru',
+            'ZA': 'South Africa',
+            'NG': 'Nigeria',
+            'KE': 'Kenya',
+            'EG': 'Egypt',
+            'AE': 'United Arab Emirates',
+            'SA': 'Saudi Arabia',
+            'IL': 'Israel',
+            'TR': 'Turkey',
+            'RU': 'Russia',
+            'UA': 'Ukraine',
+            'PK': 'Pakistan',
+            'BD': 'Bangladesh'
+        };
+
+        const getFullCountryName = (code) => {
+            return countryNames[code] || code;
+        };
+
         // API Helper
         const callAPI = async (endpoint, data) => {
             try {
@@ -34,14 +105,13 @@
             }
         };
 
-
         // Export to CSV Function
-        const exportToCSV = () => {
+        const exportToCSV = (bitlyData, eventsData, dateRange) => {
             if (!bitlyData && !eventsData) return;
             
             let csv = 'Student Recruitment Dashboard Report\n';
             csv += `Generated: ${new Date().toLocaleString()}\n`;
-            csv += `Date Range: Last ${dateRange} days\n\n`;
+            csv += `Link Data Range: Last ${dateRange} days\n\n`;
             
             // Links
             if (bitlyData?.links) {
@@ -60,7 +130,8 @@
                 csv += 'GEOGRAPHIC DISTRIBUTION\n';
                 csv += 'Country,Clicks,Percentage\n';
                 bitlyData.topCountries.forEach(country => {
-                    csv += `"${country.country}",${country.clicks},${country.percentage}%\n`;
+                    const fullName = getFullCountryName(country.country);
+                    csv += `"${fullName}",${country.clicks},${country.percentage}%\n`;
                 });
                 csv += '\n';
             }
@@ -68,12 +139,12 @@
             // Events
             if (eventsData?.upcomingEvents) {
                 csv += 'UPCOMING EVENTS\n';
-                csv += 'Date,Event Name,Venue,Capacity,Attending\n';
+                csv += 'Date,Event Name,Venue,Attending\n';
                 eventsData.upcomingEvents.forEach(event => {
                     const date = new Date(event.start).toLocaleDateString();
                     const name = event.name.replace(/"/g, '""');
                     const venue = (event.venue || 'TBA').replace(/"/g, '""');
-                    csv += `"${date}","${name}","${venue}",${event.capacity},${event.sold}\n`;
+                    csv += `"${date}","${name}","${venue}",${event.sold}\n`;
                 });
             }
             
@@ -123,7 +194,7 @@
                                 </div>
                             </div>
 
-                            {link.referrers && link.referrers.length > 0 && (
+                            {link.referrers && link.referrers.length > 0 ? (
                                 <div className="mb-6">
                                     <h4 className="font-bold text-gray-900 mb-4 text-lg">
                                         <i className="fas fa-share-alt mr-2 text-blue-600"></i>
@@ -150,6 +221,11 @@
                                         })}
                                     </div>
                                 </div>
+                            ) : (
+                                <div className="mb-6 text-center py-8 bg-gray-50 rounded-lg">
+                                    <i className="fas fa-share-alt text-4xl mb-3 text-gray-300"></i>
+                                    <p className="text-gray-500 font-medium">No referrer data available for this link</p>
+                                </div>
                             )}
 
                             {link.countries && link.countries.length > 0 && (
@@ -161,18 +237,11 @@
                                     <div className="grid grid-cols-2 gap-3">
                                         {link.countries.slice(0, 6).map((country, idx) => (
                                             <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                                <span className="font-medium text-gray-700">{country.value}</span>
+                                                <span className="font-medium text-gray-700">{getFullCountryName(country.value)}</span>
                                                 <span className="font-bold text-gray-900">{country.clicks}</span>
                                             </div>
                                         ))}
                                     </div>
-                                </div>
-                            )}
-
-                            {(!link.referrers || link.referrers.length === 0) && (!link.countries || link.countries.length === 0) && (
-                                <div className="text-center py-8 text-gray-500">
-                                    <i className="fas fa-chart-bar text-4xl mb-3 text-gray-300"></i>
-                                    <p>Detailed analytics not available for this link</p>
                                 </div>
                             )}
                         </div>
@@ -349,18 +418,11 @@
                                         </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Venue</th>
                                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('capacity')}>
-                                            Capacity {sortField === 'capacity' && (
-                                                <i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>
-                                            )}
-                                        </th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                                             onClick={() => toggleSort('sold')}>
                                             Attending {sortField === 'sold' && (
                                                 <i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>
                                             )}
                                         </th>
-
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200">
@@ -378,9 +440,6 @@
                                                 <td className="px-4 py-3 text-sm text-gray-600">
                                                     {event.venue || 'TBA'}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                                                    {event.capacity}
-                                                </td>
                                                 <td className="px-4 py-3 text-sm text-gray-900 text-right font-semibold">
                                                     {event.sold}
                                                 </td>
@@ -396,7 +455,7 @@
         };
 
         // Links Table Component
-        const LinksTable = ({ links, loading }) => {
+        const LinksTable = ({ links, loading, onViewDetails }) => {
             return (
                 <div className="bg-white p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">
@@ -441,6 +500,15 @@
                                             <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
                                                 {link.clicks.toLocaleString()}
                                             </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <button
+                                                    onClick={() => onViewDetails(link)}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-semibold transition-colors"
+                                                >
+                                                    <i className="fas fa-chart-line mr-1"></i>
+                                                    View
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -454,7 +522,6 @@
         // Main Dashboard
         const Dashboard = () => {
             const [loading, setLoading] = useState(true);
-            const [autoRefresh, setAutoRefresh] = useState(false);
             const [error, setError] = useState(null);
             const [dateRange, setDateRange] = useState(30);
             const [showReferrerModal, setShowReferrerModal] = useState(false);
@@ -466,34 +533,40 @@
             const [eventsData, setEventsData] = useState(null);
             const [lastUpdated, setLastUpdated] = useState(null);
 
-            const fetchAllData = async () => {
+            const fetchAllData = async (refetchBitly = true) => {
                 setLoading(true);
                 setError(null);
                 
                 try {
-                    // Fetch all data in parallel
-                    const [mailchimpRes, bitlyRes, ticketTailorRes] = await Promise.allSettled([
+                    const promises = [
                         callAPI('mailchimp', { action: 'getLeadStats', weeks: 12 }),
-                        callAPI('bitly', { action: 'getRecruitmentLinks', days: dateRange }),
                         callAPI('ticket-tailor', { action: 'getEvents' })
-                    ]);
+                    ];
 
-                    if (mailchimpRes.status === 'fulfilled') {
-                        setLeadStats(mailchimpRes.value);
-                    } else {
-                        console.error('Mailchimp error:', mailchimpRes.reason);
+                    if (refetchBitly) {
+                        promises.push(callAPI('bitly', { action: 'getRecruitmentLinks', days: dateRange }));
                     }
 
-                    if (bitlyRes.status === 'fulfilled') {
-                        setBitlyData(bitlyRes.value);
+                    const results = await Promise.allSettled(promises);
+
+                    if (results[0].status === 'fulfilled') {
+                        setLeadStats(results[0].value);
                     } else {
-                        console.error('Bitly error:', bitlyRes.reason);
+                        console.error('Mailchimp error:', results[0].reason);
                     }
 
-                    if (ticketTailorRes.status === 'fulfilled') {
-                        setEventsData(ticketTailorRes.value);
+                    if (results[1].status === 'fulfilled') {
+                        setEventsData(results[1].value);
                     } else {
-                        console.error('Ticket Tailor error:', ticketTailorRes.reason);
+                        console.error('Ticket Tailor error:', results[1].reason);
+                    }
+
+                    if (refetchBitly && results[2]) {
+                        if (results[2].status === 'fulfilled') {
+                            setBitlyData(results[2].value);
+                        } else {
+                            console.error('Bitly error:', results[2].reason);
+                        }
                     }
 
                     setLastUpdated(new Date());
@@ -505,16 +578,19 @@
                 }
             };
 
+            const refetchBitlyOnly = async () => {
+                try {
+                    const result = await callAPI('bitly', { action: 'getRecruitmentLinks', days: dateRange });
+                    setBitlyData(result);
+                    setLastUpdated(new Date());
+                } catch (err) {
+                    console.error('Bitly error:', err);
+                }
+            };
+
             useEffect(() => {
                 fetchAllData();
             }, []);
-
-            useEffect(() => {
-                if (autoRefresh) {
-                    const interval = setInterval(fetchAllData, 30000);
-                    return () => clearInterval(interval);
-                }
-            }, [autoRefresh]);
 
             return (
                 <div className="min-h-screen p-6">
@@ -532,28 +608,9 @@
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3">
-                                    {/* Date Range Selector */}
-                                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
-                                        <i className="fas fa-calendar-alt text-blue-600"></i>
-                                        <select
-                                            value={dateRange}
-                                            onChange={(e) => {
-                                                setDateRange(parseInt(e.target.value));
-                                                setTimeout(fetchAllData, 100);
-                                            }}
-                                            className="border-0 bg-transparent font-medium text-gray-700 focus:outline-none cursor-pointer"
-                                        >
-                                            <option value={7}>Last 7 days</option>
-                                            <option value={14}>Last 14 days</option>
-                                            <option value={30}>Last 30 days</option>
-                                            <option value={60}>Last 60 days</option>
-                                            <option value={90}>Last 90 days</option>
-                                        </select>
-                                    </div>
-
                                     {/* Export CSV Button */}
                                     <button
-                                        onClick={exportToCSV}
+                                        onClick={() => exportToCSV(bitlyData, eventsData, dateRange)}
                                         disabled={loading}
                                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 shadow-sm"
                                         title="Export data as CSV"
@@ -564,19 +621,19 @@
 
                                     {/* Refresh Button */}
                                     <button
-                                        onClick={fetchAllData}
+                                        onClick={() => fetchAllData(true)}
                                         disabled={loading}
                                         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 shadow-sm"
                                     >
                                         <i className="fas fa-sync-alt mr-2"></i>
-                                        Refresh
+                                        Refresh All
                                     </button>
                                 </div>
                             </div>
                             {lastUpdated && (
                                 <p className="text-sm text-gray-500">
                                     <i className="fas fa-clock mr-1"></i>
-                                    Last updated: {lastUpdated.toLocaleTimeString()} • Showing data for last {dateRange} days
+                                    Last updated: {lastUpdated.toLocaleTimeString()}
                                 </p>
                             )}
                         </div>
@@ -633,16 +690,81 @@
                                 }) || []}
                                 loading={loading}
                             />
-                            <ChartComponent
-                                title="Traffic Sources (Top Referrers)"
-                                type="bar"
-                                data={bitlyData?.topReferrers?.map(r => r.clicks) || []}
-                                labels={bitlyData?.topReferrers?.map(r => r.referrer) || []}
-                                loading={loading}
-                            />
+                            <div className="bg-white p-6 rounded-lg shadow-md">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-bold text-gray-800">
+                                        Traffic Sources (Top Referrers)
+                                    </h3>
+                                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+                                        <i className="fas fa-calendar-alt text-blue-600 text-sm"></i>
+                                        <select
+                                            value={dateRange}
+                                            onChange={(e) => {
+                                                setDateRange(parseInt(e.target.value));
+                                                setTimeout(() => refetchBitlyOnly(), 100);
+                                            }}
+                                            className="border-0 bg-transparent text-sm font-medium text-gray-700 focus:outline-none cursor-pointer"
+                                        >
+                                            <option value={7}>7 days</option>
+                                            <option value={14}>14 days</option>
+                                            <option value={30}>30 days</option>
+                                            <option value={60}>60 days</option>
+                                            <option value={90}>90 days</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                {loading ? (
+                                    <div className="animate-pulse" style={{ height: '300px' }}>
+                                        <div className="h-full bg-gray-200 rounded"></div>
+                                    </div>
+                                ) : (
+                                    <div style={{ height: '300px' }}>
+                                        <canvas ref={(ref) => {
+                                            if (ref && bitlyData?.topReferrers) {
+                                                const ctx = ref.getContext('2d');
+                                                new Chart(ctx, {
+                                                    type: 'bar',
+                                                    data: {
+                                                        labels: bitlyData.topReferrers.map(r => r.referrer),
+                                                        datasets: [{
+                                                            label: 'Clicks',
+                                                            data: bitlyData.topReferrers.map(r => r.clicks),
+                                                            backgroundColor: [
+                                                                'rgba(59, 130, 246, 0.8)',
+                                                                'rgba(16, 185, 129, 0.8)',
+                                                                'rgba(245, 158, 11, 0.8)',
+                                                                'rgba(239, 68, 68, 0.8)',
+                                                                'rgba(139, 92, 246, 0.8)',
+                                                                'rgba(236, 72, 153, 0.8)',
+                                                                'rgba(99, 102, 241, 0.8)',
+                                                                'rgba(251, 146, 60, 0.8)'
+                                                            ],
+                                                            borderColor: 'rgba(59, 130, 246, 1)',
+                                                            borderWidth: 2
+                                                        }]
+                                                    },
+                                                    options: {
+                                                        responsive: true,
+                                                        maintainAspectRatio: false,
+                                                        plugins: {
+                                                            legend: { display: false }
+                                                        },
+                                                        scales: {
+                                                            y: {
+                                                                beginAtZero: true,
+                                                                ticks: { precision: 0 }
+                                                            }
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }}></canvas>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Geographic Distribution */}
+                        {/* Geographic Distribution & Event Summary */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                             <div className="bg-white p-6 rounded-lg shadow-md">
                                 <h3 className="text-lg font-bold text-gray-800 mb-4">
@@ -660,10 +782,10 @@
                                             <div 
                                                 key={index} 
                                                 className="flex items-center justify-between p-3 rounded-lg hover:bg-blue-50 transition-all duration-200 cursor-default group"
-                                                title={country.country}
+                                                title={getFullCountryName(country.country)}
                                             >
-                                                <span className="font-semibold text-gray-800 group-hover:text-blue-700 transition-colors min-w-[60px]">
-                                                    {country.country}
+                                                <span className="font-semibold text-gray-800 group-hover:text-blue-700 transition-colors min-w-[120px]">
+                                                    {getFullCountryName(country.country)}
                                                 </span>
                                                 <div className="flex items-center gap-4 flex-1 ml-4">
                                                     <div className="flex-1 max-w-md bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -693,23 +815,19 @@
                                 </h3>
                                 {loading ? (
                                     <div className="animate-pulse space-y-4">
-                                        {[1,2,3].map(i => (
+                                        {[1,2].map(i => (
                                             <div key={i} className="h-12 bg-gray-200 rounded"></div>
                                         ))}
                                     </div>
                                 ) : eventsData?.summary ? (
                                     <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-                                            <span className="text-gray-700 font-medium">Total Events</span>
-                                            <span className="text-2xl font-bold text-blue-600">{eventsData.summary.totalEvents}</span>
+                                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
+                                            <span className="text-gray-700 font-medium text-lg">Total Events</span>
+                                            <span className="text-3xl font-bold text-blue-600">{eventsData.summary.totalEvents}</span>
                                         </div>
-                                        <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
-                                            <span className="text-gray-700 font-medium">People Attending</span>
-                                            <span className="text-2xl font-bold text-purple-600">{eventsData.summary.totalSold}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-                                            <span className="text-gray-700 font-medium">Attendance Rate</span>
-                                            <span className="text-2xl font-bold text-yellow-600">{eventsData.summary.attendanceRate}%</span>
+                                        <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
+                                            <span className="text-gray-700 font-medium text-lg">People Attending</span>
+                                            <span className="text-3xl font-bold text-purple-600">{eventsData.summary.totalSold}</span>
                                         </div>
                                     </div>
                                 ) : (
@@ -725,7 +843,14 @@
 
                         {/* Links Table */}
                         <div className="mb-6">
-                            <LinksTable links={bitlyData?.links} loading={loading} />
+                            <LinksTable 
+                                links={bitlyData?.links} 
+                                loading={loading}
+                                onViewDetails={(link) => {
+                                    setSelectedLink(link);
+                                    setShowReferrerModal(true);
+                                }}
+                            />
                         </div>
 
                         {/* Footer */}
