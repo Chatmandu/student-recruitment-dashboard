@@ -34,6 +34,136 @@
             }
         };
 
+
+        // Export Functions
+        const exportToCSV = () => {
+            if (!bitlyData || !eventsData) return;
+            
+            let csv = 'Student Recruitment Dashboard Report\n';
+            csv += `Generated: ${new Date().toLocaleString()}\n`;
+            csv += `Date Range: Last ${dateRange} days\n\n`;
+            
+            // Link Performance
+            csv += 'LINK PERFORMANCE\n';
+            csv += 'Link,Clicks,Tags\n';
+            bitlyData.links?.forEach(link => {
+                csv += `"${link.title || link.id}",${link.clicks},"${link.tags?.join(', ') || ''}"\n`;
+            });
+            
+            csv += '\nGEOGRAPHIC DISTRIBUTION\n';
+            csv += 'Country,Clicks,Percentage\n';
+            bitlyData.topCountries?.forEach(country => {
+                csv += `${country.country},${country.clicks},${country.percentage}%\n`;
+            });
+            
+            csv += '\nTRAFFIC SOURCES\n';
+            csv += 'Referrer,Clicks\n';
+            bitlyData.topReferrers?.forEach(ref => {
+                csv += `${ref.referrer},${ref.clicks}\n`;
+            });
+            
+            csv += '\nUPCOMING EVENTS\n';
+            csv += 'Event,Date,Venue,Capacity,Attending\n';
+            eventsData.upcomingEvents?.forEach(event => {
+                const date = new Date(event.start).toLocaleDateString();
+                csv += `"${event.name}",${date},"${event.venue}",${event.capacity},${event.sold}\n`;
+            });
+            
+            // Download
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `recruitment-dashboard-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        const exportToPDF = () => {
+            window.print();
+        };
+
+        // Referrer Modal Component
+        const ReferrerModal = ({ link, onClose }) => {
+            if (!link) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+                    <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">{link.title || link.id}</h3>
+                                <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" 
+                                   className="text-sm text-blue-600 hover:underline">
+                                    {link.id}
+                                </a>
+                            </div>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                                <i className="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        
+                        <div className="mb-6">
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                    <p className="text-sm text-gray-600">Total Clicks</p>
+                                    <p className="text-3xl font-bold text-blue-600">{link.clicks}</p>
+                                </div>
+                                <div className="bg-green-50 p-4 rounded-lg">
+                                    <p className="text-sm text-gray-600">Unique Countries</p>
+                                    <p className="text-3xl font-bold text-green-600">{link.countries?.length || 0}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <h4 className="font-semibold text-gray-900 mb-3">
+                                <i className="fas fa-share-alt mr-2"></i>Traffic Sources
+                            </h4>
+                            {link.referrers && link.referrers.length > 0 ? (
+                                <div className="space-y-2">
+                                    {link.referrers.map((ref, index) => (
+                                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                            <span className="font-medium text-gray-700">{ref.value}</span>
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-32 bg-gray-200 rounded-full h-2">
+                                                    <div
+                                                        className="bg-blue-600 h-2 rounded-full"
+                                                        style={{ width: `${(ref.clicks / link.clicks * 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                                <span className="font-bold text-gray-900 w-16 text-right">{ref.clicks}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-gray-500 italic">No referrer data available</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <h4 className="font-semibold text-gray-900 mb-3">
+                                <i className="fas fa-globe mr-2"></i>Top Countries
+                            </h4>
+                            {link.countries && link.countries.length > 0 ? (
+                                <div className="space-y-2">
+                                    {link.countries.slice(0, 5).map((country, index) => (
+                                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                            <span className="font-medium text-gray-700">{country.value}</span>
+                                            <span className="font-bold text-gray-900">{country.clicks} clicks</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-gray-500 italic">No country data available</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // KPI Card Component
         const KPICard = ({ title, value, change, icon, color, loading, subtitle }) => {
             const isPositive = change >= 0;
@@ -303,152 +433,14 @@
             );
         };
 
-        // Link Trends Chart Component - Shows top recruitment links performance
-        const LinkTrendsChart = ({ bitlyData, loading }) => {
-            const chartRef = useRef(null);
-            const chartInstance = useRef(null);
-
-            useEffect(() => {
-                if (chartRef.current && !loading && bitlyData?.links) {
-                    const ctx = chartRef.current.getContext('2d');
-                    
-                    if (chartInstance.current) {
-                        chartInstance.current.destroy();
-                    }
-
-                    // Get top 5 links by clicks
-                    const topLinks = [...(bitlyData.links || [])]
-                        .sort((a, b) => b.clicks - a.clicks)
-                        .slice(0, 5);
-
-                    // Colors for each link
-                    const colors = [
-                        'rgba(59, 130, 246, 0.8)',    // blue
-                        'rgba(16, 185, 129, 0.8)',     // green
-                        'rgba(245, 158, 11, 0.8)',     // amber
-                        'rgba(239, 68, 68, 0.8)',      // red
-                        'rgba(139, 92, 246, 0.8)'      // purple
-                    ];
-
-                    const datasets = [{
-                        label: 'Clicks (30 days)',
-                        data: topLinks.map(link => link.clicks),
-                        backgroundColor: colors,
-                        borderColor: colors.map(c => c.replace('0.8', '1')),
-                        borderWidth: 2
-                    }];
-
-                    chartInstance.current = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: topLinks.map(link => {
-                                const title = link.title || link.id;
-                                return title.length > 30 ? title.substring(0, 30) + '...' : title;
-                            }),
-                            datasets: datasets
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        title: function(context) {
-                                            const link = topLinks[context[0].dataIndex];
-                                            return link.title || link.id;
-                                        },
-                                        label: function(context) {
-                                            return 'Clicks: ' + context.parsed.y.toLocaleString();
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        precision: 0
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-
-                return () => {
-                    if (chartInstance.current) {
-                        chartInstance.current.destroy();
-                    }
-                };
-            }, [bitlyData, loading]);
-
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">
-                        <i className="fas fa-chart-line mr-2"></i>Link Performance - Top Student Recruitment Links
-                    </h3>
-                    {loading ? (
-                        <div className="animate-pulse" style={{ height: '300px' }}>
-                            <div className="h-full bg-gray-200 rounded"></div>
-                        </div>
-                    ) : bitlyData?.links && bitlyData.links.length > 0 ? (
-                        <div>
-                            <div style={{ height: '300px' }}>
-                                <canvas ref={chartRef}></canvas>
-                            </div>
-                            <div className="mt-6 pt-4 border-t">
-                                <p className="text-sm font-semibold text-gray-600 mb-3">LINK DETAILS:</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {bitlyData.links.sort((a, b) => b.clicks - a.clicks).slice(0, 6).map((link, index) => (
-                                        <div key={index} className="p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors border border-gray-200">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className="text-xs font-bold text-white bg-blue-600 rounded-full w-6 h-6 flex items-center justify-center">
-                                                    {index + 1}
-                                                </span>
-                                                <div className="text-right">
-                                                    <div className="text-2xl font-bold text-blue-600">{link.clicks}</div>
-                                                    <div className="text-xs text-gray-500">clicks</div>
-                                                </div>
-                                            </div>
-                                            <p className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">
-                                                {link.title || 'Untitled'}
-                                            </p>
-                                            <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" 
-                                               className="text-xs text-blue-600 hover:underline font-mono block truncate">
-                                                {link.id}
-                                            </a>
-                                            {link.tags && link.tags.length > 0 && (
-                                                <div className="mt-2 flex flex-wrap gap-1">
-                                                    {link.tags.slice(0, 2).map((tag, i) => (
-                                                        <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                                                            {tag}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center py-12">
-                            <i className="fas fa-link text-gray-300 text-5xl mb-4"></i>
-                            <p className="text-gray-500">No link data available</p>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
         // Main Dashboard
         const Dashboard = () => {
             const [loading, setLoading] = useState(true);
             const [autoRefresh, setAutoRefresh] = useState(false);
             const [error, setError] = useState(null);
+            const [dateRange, setDateRange] = useState(30); // days
+            const [showReferrerModal, setShowReferrerModal] = useState(false);
+            const [selectedLink, setSelectedLink] = useState(null);
             
             // Data states
             const [leadStats, setLeadStats] = useState(null);
@@ -464,7 +456,7 @@
                     // Fetch all data in parallel
                     const [mailchimpRes, bitlyRes, ticketTailorRes] = await Promise.allSettled([
                         callAPI('mailchimp', { action: 'getLeadStats', weeks: 12 }),
-                        callAPI('bitly', { action: 'getRecruitmentLinks', days: 30 }),
+                        callAPI('bitly', { action: 'getRecruitmentLinks', days: dateRange }),
                         callAPI('ticket-tailor', { action: 'getEvents' })
                     ]);
 
@@ -580,7 +572,7 @@
                                 subtitle={`${leadStats?.conversionRate || 0}% conversion rate`}
                             />
                             <KPICard
-                                title="Link Clicks (30d)"
+                                title={`Link Clicks (${dateRange}d)`}
                                 value={bitlyData?.totalClicks?.toLocaleString() || '0'}
                                 change={null}
                                 icon="fas fa-mouse-pointer"
@@ -620,21 +612,44 @@
                             />
                         </div>
 
-                        {/* Link Performance Trends */}
-                        <div className="mb-6">
-                            <LinkTrendsChart bitlyData={bitlyData} loading={loading} />
-                        </div>
-
                         {/* Geographic Distribution */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <ChartComponent
-                                title="Geographic Distribution - Where Your Audience Is"
-                                type="bar"
-                                data={bitlyData?.topCountries?.map(c => c.clicks) || []}
-                                labels={bitlyData?.topCountries?.map(c => `${c.country} (${c.percentage}%)`) || []}
-                                loading={loading}
-                                height={300}
-                            />
+                            <div className="bg-white p-6 rounded-lg shadow-md">
+                                <h3 className="text-lg font-bold text-gray-800 mb-4">
+                                    <i className="fas fa-globe mr-2"></i>Geographic Distribution - Where Your Audience Is
+                                </h3>
+                                {loading ? (
+                                    <div className="animate-pulse" style={{ height: '300px' }}>
+                                        <div className="h-full bg-gray-200 rounded"></div>
+                                    </div>
+                                ) : bitlyData?.topCountries && bitlyData.topCountries.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {bitlyData.topCountries.map((country, index) => (
+                                            <div key={index} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group" title={country.country}>
+                                                <span className="font-medium text-gray-700 group-hover:text-blue-600 transition-colors">
+                                                    {country.country}
+                                                </span>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-48 bg-gray-200 rounded-full h-3">
+                                                        <div
+                                                            className="bg-blue-600 h-3 rounded-full transition-all duration-500 group-hover:bg-blue-700"
+                                                            style={{ width: `${country.percentage}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className="font-semibold text-gray-800 w-16 text-right">
+                                                        {country.percentage}%
+                                                    </span>
+                                                    <span className="text-gray-600 w-20 text-right font-bold">
+                                                        {country.clicks.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-500 text-center py-8">No geographic data available</p>
+                                )}
+                            </div>
 
                             <div className="bg-white p-6 rounded-lg shadow-md">
                                 <h3 className="text-lg font-bold text-gray-800 mb-4">
@@ -674,7 +689,7 @@
 
                         {/* Links Table */}
                         <div className="mb-6">
-                            <LinksTable links={bitlyData?.links} loading={loading} />
+                            <LinksTable links={bitlyData?.links} loading={loading} onViewReferrers={(link) => { setSelectedLink(link); setShowReferrerModal(true); }} />
                         </div>
 
                         {/* Footer */}
@@ -683,6 +698,14 @@
                             <p className="mt-1">Recruitment Period: October - August</p>
                         </div>
                     </div>
+
+                    {/* Referrer Modal */}
+                    {showReferrerModal && (
+                        <ReferrerModal 
+                            link={selectedLink} 
+                            onClose={() => { setShowReferrerModal(false); setSelectedLink(null); }}
+                        />
+                    )}
                 </div>
             );
         };
