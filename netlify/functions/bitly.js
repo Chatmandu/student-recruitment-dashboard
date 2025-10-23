@@ -63,20 +63,35 @@ exports.handler = async (event) => {
         console.log('Fetching referrer data...');
         
         // Get referrer data for each link
+        // NOTE: Bitly's /referrers endpoint doesn't accept 'units' parameter like /clicks does
         const referrerPromises = recruitmentLinks.map(link => {
           const encodedId = encodeURIComponent(link.id);
           return axios.get(`https://api-ssl.bitly.com/v4/bitlinks/${encodedId}/referrers`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-            params: { unit: 'day', units: days }
+            headers: { 'Authorization': `Bearer ${token}` }
+            // No time-range params - referrers endpoint returns all-time data
           }).then(res => {
-            // Bitly returns referrers in 'metrics' array, not 'referrers'
-            const referrerCount = res.data.metrics?.length || 0;
-            console.log(`Referrers for ${link.id}:`, referrerCount);
-            return res;
+            // Log the full response structure for debugging
+            console.log(`Raw referrer response for ${link.id}:`, JSON.stringify(res.data).substring(0, 200));
+            
+            // Bitly returns referrers in different possible formats
+            let metrics = [];
+            if (res.data.facet === 'referrers' && Array.isArray(res.data.referrers)) {
+              metrics = res.data.referrers;
+            } else if (Array.isArray(res.data.metrics)) {
+              metrics = res.data.metrics;
+            } else if (Array.isArray(res.data)) {
+              metrics = res.data;
+            }
+            
+            const referrerCount = metrics.length;
+            const totalClicks = metrics.reduce((sum, ref) => sum + (ref.clicks || ref.value || 0), 0);
+            console.log(`Referrers for ${link.id}: ${referrerCount} sources, ${totalClicks} clicks`);
+            
+            return { data: { metrics: metrics } };
           }).catch(err => {
             console.error(`Error fetching referrers for ${link.id}:`, err.response?.data || err.message);
             console.error(`Status code:`, err.response?.status);
-            return { data: { referrers: [] } };
+            return { data: { metrics: [] } };
           });
         });
 
