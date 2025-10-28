@@ -721,6 +721,13 @@
                 fetchAllData();
             }, []);
 
+            // Refetch Bitly data when date range changes
+            useEffect(() => {
+                if (bitlyData !== null) { // Only refetch if we've already loaded data once
+                    refetchBitlyOnly();
+                }
+            }, [dateRange]);
+
             return (
                 <div className="min-h-screen p-6">
                     <div className="max-w-7xl mx-auto">
@@ -895,7 +902,6 @@
                                 dateRange={dateRange}
                                 onDateRangeChange={(newRange) => {
                                     setDateRange(newRange);
-                                    setTimeout(() => refetchBitlyOnly(), 100);
                                 }}
                                 onViewDetails={(link) => {
                                     console.log('Opening modal for link:', link);
