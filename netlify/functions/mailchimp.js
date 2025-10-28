@@ -1,7 +1,5 @@
-const fetch = require('node-fetch');
-
 const MAILCHIMP_API_KEY = process.env.MAILCHIMP_API_KEY;
-const MAILCHIMP_SERVER = process.env.MAILCHIMP_SERVER;
+const MAILCHIMP_SERVER = process.env.MAILCHIMP_SERVER_PREFIX;
 const AUDIENCE_ID = process.env.MAILCHIMP_AUDIENCE_ID;
 
 const headers = {
@@ -45,28 +43,57 @@ exports.handler = async (event) => {
     }
 };
 
+async function mailchimpFetch(url) {
+    const https = require('https');
+    
+    return new Promise((resolve, reject) => {
+        const options = {
+            headers: headers
+        };
+        
+        https.get(url, options, (res) => {
+            let data = '';
+            
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    resolve({ ok: res.statusCode === 200, data: parsed, status: res.statusCode });
+                } catch (e) {
+                    reject(new Error('Failed to parse response'));
+                }
+            });
+        }).on('error', (err) => {
+            reject(err);
+        });
+    });
+}
+
 async function getLeadStats(corsHeaders) {
     try {
         // Get total member count
         const membersUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}`;
-        const membersResponse = await fetch(membersUrl, { headers });
-        const membersData = await membersResponse.json();
+        const membersResult = await mailchimpFetch(membersUrl);
         
-        if (!membersResponse.ok) {
-            throw new Error(membersData.detail || 'Failed to fetch members');
+        if (!membersResult.ok) {
+            throw new Error(membersResult.data.detail || 'Failed to fetch members');
         }
 
+        const membersData = membersResult.data;
         const totalLeads = membersData.stats.member_count;
 
         // Get applicants count (members tagged with 'applicant')
         const applicantsUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}/members?count=1000&status=subscribed`;
-        const applicantsResponse = await fetch(applicantsUrl, { headers });
-        const applicantsData = await applicantsResponse.json();
+        const applicantsResult = await mailchimpFetch(applicantsUrl);
         
-        if (!applicantsResponse.ok) {
-            throw new Error(applicantsData.detail || 'Failed to fetch applicants');
+        if (!applicantsResult.ok) {
+            throw new Error(applicantsResult.data.detail || 'Failed to fetch applicants');
         }
 
+        const applicantsData = applicantsResult.data;
         const applicants = applicantsData.members.filter(member => 
             member.tags && member.tags.some(tag => tag.name.toLowerCase() === 'applicant')
         ).length;
@@ -84,11 +111,10 @@ async function getLeadStats(corsHeaders) {
             weekEnd.setDate(now.getDate() - (i * 7));
             
             const activityUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}/growth-history`;
-            const activityResponse = await fetch(activityUrl, { headers });
-            const activityData = await activityResponse.json();
+            const activityResult = await mailchimpFetch(activityUrl);
             
-            if (activityResponse.ok && activityData.history) {
-                const weekHistory = activityData.history.find(h => {
+            if (activityResult.ok && activityResult.data.history) {
+                const weekHistory = activityResult.data.history.find(h => {
                     const historyDate = new Date(h.month);
                     return historyDate >= weekStart && historyDate <= weekEnd;
                 });
@@ -142,15 +168,16 @@ async function getLeadStats(corsHeaders) {
 async function getCampaigns(corsHeaders) {
     try {
         // Get campaigns sent to the student recruitment audience
-        // We'll fetch the last 20 sent campaigns
+        // We'll fetch the last 100 sent campaigns and filter to 20
         const campaignsUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/campaigns?count=100&status=sent&list_id=${AUDIENCE_ID}&sort_field=send_time&sort_dir=DESC`;
         
-        const campaignsResponse = await fetch(campaignsUrl, { headers });
-        const campaignsData = await campaignsResponse.json();
+        const campaignsResult = await mailchimpFetch(campaignsUrl);
         
-        if (!campaignsResponse.ok) {
-            throw new Error(campaignsData.detail || 'Failed to fetch campaigns');
+        if (!campaignsResult.ok) {
+            throw new Error(campaignsResult.data.detail || 'Failed to fetch campaigns');
         }
+
+        const campaignsData = campaignsResult.data;
 
         // Process campaigns to extract key metrics
         const campaigns = campaignsData.campaigns
