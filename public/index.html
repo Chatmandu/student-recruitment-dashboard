@@ -11,6 +11,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --primary-red: #DC002E;
+            --secondary-burgundy: #790033;
+            --accent-cream: #F4F1DE;
+        }
+        
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -33,9 +39,63 @@
             max-height: 90vh;
             overflow: auto;
         }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 280px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 12px;
+            position: absolute;
+            z-index: 10000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -140px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 13px;
+            line-height: 1.5;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Corporate color utilities */
+        .bg-primary { background-color: var(--primary-red); }
+        .bg-secondary { background-color: var(--secondary-burgundy); }
+        .bg-accent { background-color: var(--accent-cream); }
+        .text-primary { color: var(--primary-red); }
+        .text-secondary { color: var(--secondary-burgundy); }
+        .border-primary { border-color: var(--primary-red); }
+        .border-secondary { border-color: var(--secondary-burgundy); }
+        
+        .hover-primary:hover { background-color: var(--primary-red); }
+        .hover-secondary:hover { background-color: var(--secondary-burgundy); }
     </style>
 </head>
-<body class="bg-gray-50">
+<body style="background-color: #F4F1DE;">
     <div id="root"></div>
     <div id="modal-root"></div>
 
@@ -62,6 +122,14 @@
 
         const getFullCountryName = (code) => countryNames[code] || code;
 
+        // Tooltip Component
+        const InfoTooltip = ({ text }) => (
+            <span className="tooltip ml-1">
+                <i className="fas fa-info-circle text-gray-400 hover:text-gray-600 text-sm"></i>
+                <span className="tooltiptext">{text}</span>
+            </span>
+        );
+
         // API Helper
         const callAPI = async (endpoint, data) => {
             try {
@@ -79,11 +147,23 @@
         };
 
         // Export to CSV
-        const exportToCSV = (bitlyData, eventsData, dateRange) => {
-            if (!bitlyData && !eventsData) return;
+        const exportToCSV = (bitlyData, eventsData, campaignData, dateRange) => {
+            if (!bitlyData && !eventsData && !campaignData) return;
             let csv = 'Student Recruitment Dashboard Report\n';
             csv += `Generated: ${new Date().toLocaleString()}\n`;
             csv += `Link Data Range: Last ${dateRange} days\n\n`;
+            
+            if (campaignData?.campaigns) {
+                csv += 'EMAIL CAMPAIGNS\n';
+                csv += 'Campaign,Send Date,Recipients,Opens,Open Rate,Clicks,Click Rate\n';
+                campaignData.campaigns.forEach(campaign => {
+                    const title = campaign.title.replace(/"/g, '""');
+                    const sendDate = new Date(campaign.send_time).toLocaleDateString();
+                    csv += `"${title}","${sendDate}",${campaign.emails_sent},${campaign.opens},${campaign.open_rate}%,${campaign.clicks},${campaign.click_rate}%\n`;
+                });
+                csv += '\n';
+            }
+            
             if (bitlyData?.links) {
                 csv += 'RECRUITMENT LINKS\n';
                 csv += 'Link,Title,Clicks,Tags\n';
@@ -94,6 +174,7 @@
                 });
                 csv += '\n';
             }
+            
             if (bitlyData?.topCountries) {
                 csv += 'GEOGRAPHIC DISTRIBUTION\n';
                 csv += 'Country,Clicks,Percentage\n';
@@ -103,6 +184,7 @@
                 });
                 csv += '\n';
             }
+            
             if (eventsData?.upcomingEvents) {
                 csv += 'UPCOMING EVENTS\n';
                 csv += 'Date,Event Name,Venue,Attending\n';
@@ -113,6 +195,7 @@
                     csv += `"${date}","${name}","${venue}",${event.sold}\n`;
                 });
             }
+            
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -132,77 +215,82 @@
                         <div className="sticky top-0 bg-white border-b border-gray-200 p-6">
                             <div className="flex justify-between items-start">
                                 <div className="flex-1 pr-4">
-                                    <h3 className="text-2xl font-bold text-gray-900 mb-1">{link.title || 'Link Details'}</h3>
-                                    <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" 
-                                       className="text-blue-600 hover:underline text-sm font-mono">
-                                        {link.shortUrl}
-                                    </a>
+                                    <h2 className="text-2xl font-bold text-secondary mb-2">Link Analytics</h2>
+                                    <p className="text-sm text-gray-600 break-all">{link.id}</p>
+                                    {link.title && <p className="text-gray-800 mt-1 font-medium">{link.title}</p>}
                                 </div>
-                                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl leading-none font-light">
-                                    ×
-                                </button>
+                                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none">×</button>
                             </div>
                         </div>
                         
                         <div className="p-6">
+                            {/* Data Source Explanation */}
+                            <div className="mb-6 p-4 bg-blue-50 border-l-4 border-primary rounded">
+                                <h3 className="font-semibold text-secondary mb-2 flex items-center">
+                                    <i className="fas fa-info-circle mr-2"></i>
+                                    Understanding the Data
+                                </h3>
+                                <p className="text-sm text-gray-700 mb-2">
+                                    <strong>Clicks (Selected Period):</strong> Shows clicks for your chosen date range on the dashboard. This data comes from Bitly's time-filtered API endpoint.
+                                </p>
+                                <p className="text-sm text-gray-700">
+                                    <strong>Total Clicks (All-Time):</strong> Shows all clicks since the link was created. This comes from Bitly's referrer endpoint, which doesn't support date filtering, so it always shows complete historical data.
+                                </p>
+                            </div>
+                            
                             <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div className="bg-blue-50 p-6 rounded-lg text-center">
-                                    <div className="text-4xl font-bold text-blue-600 mb-2">{link.clicks || 0}</div>
-                                    <div className="text-sm text-gray-600 font-medium">Total Clicks</div>
-                                </div>
-                                <div className="bg-green-50 p-6 rounded-lg text-center">
-                                    <div className="text-4xl font-bold text-green-600 mb-2">
-                                        {link.countries?.length || 0}
+                                <div className="bg-accent p-4 rounded-lg border border-primary">
+                                    <div className="text-sm text-gray-600 mb-1 flex items-center">
+                                        Clicks (Selected Period)
+                                        <InfoTooltip text="Filtered by your dashboard date range. Source: Bitly clicks/summary API endpoint." />
                                     </div>
-                                    <div className="text-sm text-gray-600 font-medium">Countries</div>
+                                    <div className="text-3xl font-bold text-secondary">{link.clicks?.toLocaleString() || 0}</div>
+                                </div>
+                                <div className="bg-accent p-4 rounded-lg border border-primary">
+                                    <div className="text-sm text-gray-600 mb-1 flex items-center">
+                                        Total Clicks (All-Time)
+                                        <InfoTooltip text="All clicks since link creation. Source: Bitly referrers API endpoint (not date-filterable)." />
+                                    </div>
+                                    <div className="text-3xl font-bold text-secondary">{link.totalClicks?.toLocaleString() || 0}</div>
                                 </div>
                             </div>
 
-                            {link.referrers && link.referrers.length > 0 ? (
+                            {link.referrers && link.referrers.length > 0 && (
                                 <div className="mb-6">
-                                    <h4 className="font-bold text-gray-900 mb-4 text-lg">
-                                        <i className="fas fa-share-alt mr-2 text-blue-600"></i>
-                                        Traffic Sources
-                                    </h4>
-                                    <div className="space-y-3">
-                                        {link.referrers.map((ref, idx) => {
-                                            const percentage = ((ref.clicks / link.clicks) * 100).toFixed(1);
-                                            return (
-                                                <div key={idx} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                                                    <div className="flex-1">
-                                                        <div className="font-medium text-gray-900 mb-1">{ref.value}</div>
-                                                        <div className="w-full bg-gray-200 rounded-full h-2">
-                                                            <div className="bg-blue-600 h-2 rounded-full transition-all"
-                                                                 style={{ width: `${percentage}%` }}></div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="font-bold text-gray-900 text-lg">{ref.clicks}</div>
-                                                        <div className="text-xs text-gray-500">{percentage}%</div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                    <h3 className="text-lg font-bold text-secondary mb-3 flex items-center">
+                                        <i className="fas fa-share-alt mr-2"></i>
+                                        Traffic Sources (All-Time)
+                                        <InfoTooltip text="Shows where visitors came from across the entire link history. Source: Bitly referrers API." />
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {link.referrers.map((ref, idx) => (
+                                            <div key={idx} className="flex justify-between items-center p-3 bg-accent rounded hover:bg-gray-100 transition-colors">
+                                                <span className="text-gray-800 font-medium">{ref.referrer}</span>
+                                                <span className="font-bold text-secondary">{ref.clicks.toLocaleString()}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="mb-6 text-center py-8 bg-gray-50 rounded-lg">
-                                    <i className="fas fa-share-alt text-4xl mb-3 text-gray-300"></i>
-                                    <p className="text-gray-500 font-medium">No referrer data available for this link</p>
                                 </div>
                             )}
 
                             {link.countries && link.countries.length > 0 && (
                                 <div>
-                                    <h4 className="font-bold text-gray-900 mb-4 text-lg">
-                                        <i className="fas fa-globe mr-2 text-green-600"></i>
-                                        Top Countries
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {link.countries.slice(0, 6).map((country, idx) => (
-                                            <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                                <span className="font-medium text-gray-700">{getFullCountryName(country.value)}</span>
-                                                <span className="font-bold text-gray-900">{country.clicks}</span>
+                                    <h3 className="text-lg font-bold text-secondary mb-3 flex items-center">
+                                        <i className="fas fa-globe mr-2"></i>
+                                        Geographic Distribution (All-Time)
+                                        <InfoTooltip text="Shows visitor locations across entire link history. Source: Bitly countries API." />
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {link.countries.map((country, idx) => (
+                                            <div key={idx} className="flex items-center gap-4 p-3 bg-accent rounded hover:bg-gray-100 transition-colors">
+                                                <span className="font-semibold text-gray-800 min-w-[150px]">
+                                                    {getFullCountryName(country.country)}
+                                                </span>
+                                                <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                                                    <div className="bg-primary h-2.5 rounded-full" style={{ width: `${country.percentage}%` }}></div>
+                                                </div>
+                                                <span className="font-bold text-secondary w-14 text-right">{country.percentage}%</span>
+                                                <span className="text-gray-700 font-medium w-12 text-right">{country.clicks}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -217,185 +305,264 @@
         };
 
         // KPI Card Component
-        const KPICard = ({ title, value, change, icon, color, loading, subtitle }) => {
-            const isPositive = change >= 0;
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                    <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                            <p className="text-gray-500 text-sm font-medium uppercase tracking-wide">{title}</p>
-                            {loading ? (
-                                <div className="animate-pulse mt-2">
-                                    <div className="h-8 bg-gray-200 rounded w-24"></div>
-                                </div>
-                            ) : (
-                                <>
-                                    <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
-                                    {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-                                    {change !== null && change !== undefined && (
-                                        <p className={`text-sm mt-2 font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                            <i className={`fas fa-arrow-${isPositive ? 'up' : 'down'} mr-1`}></i>
-                                            {Math.abs(change)}% vs last week
-                                        </p>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                        <div className={`${color} p-4 rounded-full shadow-md`}>
-                            <i className={`${icon} text-2xl text-white`}></i>
-                        </div>
+        const KPICard = ({ title, value, change, icon, color, loading, subtitle, tooltip }) => (
+            <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-gray-600 uppercase flex items-center">
+                        {title}
+                        {tooltip && <InfoTooltip text={tooltip} />}
+                    </h3>
+                    <div className={`${color} p-3 rounded-full`}>
+                        <i className={`${icon} text-white text-xl`}></i>
                     </div>
                 </div>
-            );
-        };
+                {loading ? (
+                    <div className="animate-pulse">
+                        <div className="h-8 bg-gray-200 rounded w-24 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-32"></div>
+                    </div>
+                ) : (
+                    <>
+                        <p className="text-3xl font-bold text-gray-800">{value}</p>
+                        {subtitle && <p className="text-sm text-gray-500 mt-2">{subtitle}</p>}
+                        {change !== null && change !== undefined && (
+                            <p className={`text-sm mt-2 font-semibold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <i className={`fas fa-arrow-${change >= 0 ? 'up' : 'down'} mr-1`}></i>
+                                {Math.abs(change)}% from last week
+                            </p>
+                        )}
+                    </>
+                )}
+            </div>
+        );
 
         // Chart Component
-        const ChartComponent = ({ title, type, data, labels, loading, height = 300 }) => {
+        const ChartComponent = ({ title, type, data, labels, loading, tooltip }) => {
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
             useEffect(() => {
-                if (chartRef.current && !loading && data && labels) {
-                    const ctx = chartRef.current.getContext('2d');
-                    if (chartInstance.current) chartInstance.current.destroy();
-                    chartInstance.current = new Chart(ctx, {
-                        type: type,
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: title,
-                                data: data,
-                                backgroundColor: type === 'line' ? 'rgba(59, 130, 246, 0.1)' : [
-                                    'rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)',
-                                    'rgba(245, 158, 11, 0.8)', 'rgba(239, 68, 68, 0.8)',
-                                    'rgba(139, 92, 246, 0.8)', 'rgba(236, 72, 153, 0.8)',
-                                    'rgba(99, 102, 241, 0.8)', 'rgba(251, 146, 60, 0.8)'
-                                ],
-                                borderColor: 'rgba(59, 130, 246, 1)',
-                                borderWidth: 2,
-                                fill: type === 'line',
-                                tension: 0.4
-                            }]
+                if (loading || !chartRef.current || !data || data.length === 0) return;
+
+                if (chartInstance.current) {
+                    chartInstance.current.destroy();
+                }
+
+                const ctx = chartRef.current.getContext('2d');
+                chartInstance.current = new Chart(ctx, {
+                    type: type,
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: title,
+                            data: data,
+                            backgroundColor: type === 'line' ? 'rgba(220, 0, 46, 0.1)' : 'rgba(220, 0, 46, 0.8)',
+                            borderColor: '#DC002E',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: type === 'line'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { 
+                                backgroundColor: '#790033',
+                                titleColor: '#F4F1DE',
+                                bodyColor: '#F4F1DE'
+                            }
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: type !== 'line', position: 'bottom' },
-                                tooltip: { mode: 'index', intersect: false }
+                        scales: {
+                            y: { 
+                                beginAtZero: true,
+                                ticks: { color: '#790033' },
+                                grid: { color: 'rgba(121, 0, 51, 0.1)' }
                             },
-                            scales: type === 'line' || type === 'bar' ? {
-                                y: { beginAtZero: true, ticks: { precision: 0 } }
-                            } : {}
+                            x: { 
+                                ticks: { color: '#790033' },
+                                grid: { color: 'rgba(121, 0, 51, 0.1)' }
+                            }
                         }
-                    });
-                }
-                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-            }, [data, labels, type, title, loading]);
+                    }
+                });
+
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+                };
+            }, [data, labels, loading, type, title]);
 
             return (
                 <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">{title}</h3>
-                    {loading ? (
-                        <div className="animate-pulse" style={{ height: `${height}px` }}>
-                            <div className="h-full bg-gray-200 rounded"></div>
-                        </div>
-                    ) : (
-                        <div style={{ height: `${height}px` }}>
-                            <canvas ref={chartRef}></canvas>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        // Events Table Component
-        const EventsTable = ({ events, loading }) => {
-            const [sortField, setSortField] = useState('start');
-            const [sortDirection, setSortDirection] = useState('asc');
-
-            const sortedEvents = events ? [...events].sort((a, b) => {
-                const aVal = a[sortField];
-                const bVal = b[sortField];
-                const modifier = sortDirection === 'asc' ? 1 : -1;
-                return aVal > bVal ? modifier : -modifier;
-            }) : [];
-
-            const toggleSort = (field) => {
-                if (sortField === field) {
-                    setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-                } else {
-                    setSortField(field);
-                    setSortDirection('asc');
-                }
-            };
-
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4">
-                        <i className="fas fa-calendar-alt mr-2"></i>Upcoming Events
+                    <h3 className="text-lg font-bold text-secondary mb-4 flex items-center">
+                        <i className={`fas fa-chart-${type === 'line' ? 'line' : 'bar'} mr-2`}></i>
+                        {title}
+                        {tooltip && <InfoTooltip text={tooltip} />}
                     </h3>
                     {loading ? (
-                        <div className="animate-pulse space-y-3">
-                            {[1,2,3,4,5].map(i => (<div key={i} className="h-16 bg-gray-200 rounded"></div>))}
-                        </div>
+                        <div className="animate-pulse h-64 bg-gray-200 rounded"></div>
+                    ) : data && data.length > 0 ? (
+                        <canvas ref={chartRef}></canvas>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('start')}>
-                                            Date {sortField === 'start' && (<i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>)}
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('name')}>
-                                            Event Name {sortField === 'name' && (<i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>)}
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Venue</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                                            onClick={() => toggleSort('sold')}>
-                                            Attending {sortField === 'sold' && (<i className={`fas fa-chevron-${sortDirection === 'asc' ? 'up' : 'down'} ml-1`}></i>)}
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {sortedEvents.map((event, index) => {
-                                        const date = new Date(event.start);
-                                        return (
-                                            <tr key={index} className="hover:bg-gray-50">
-                                                <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                                                    {date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{event.name}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-600">{event.venue || 'TBA'}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-900 text-right font-semibold">{event.sold}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                        <p className="text-gray-500 text-center py-8">No data available</p>
                     )}
                 </div>
             );
         };
 
+        // Email Campaigns Table Component
+        const CampaignsTable = ({ campaigns, loading }) => (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="p-6 border-b bg-secondary">
+                    <h2 className="text-xl font-bold text-white flex items-center">
+                        <i className="fas fa-envelope mr-3"></i>
+                        Email Campaigns - Student Recruitment
+                        <InfoTooltip text="Shows campaigns sent to your student recruitment audience in Mailchimp. Metrics include sends, opens, clicks and engagement rates. Source: Mailchimp Campaigns API." />
+                    </h2>
+                </div>
+                <div className="overflow-x-auto">
+                    {loading ? (
+                        <div className="p-6 animate-pulse space-y-4">
+                            {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-200 rounded"></div>)}
+                        </div>
+                    ) : campaigns && campaigns.length > 0 ? (
+                        <table className="w-full">
+                            <thead className="bg-accent">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Campaign</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Send Date</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-secondary uppercase tracking-wider">Recipients</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-secondary uppercase tracking-wider">Opens</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-secondary uppercase tracking-wider">Open Rate</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-secondary uppercase tracking-wider">Clicks</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-secondary uppercase tracking-wider">Click Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {campaigns.map((campaign, index) => (
+                                    <tr key={index} className="hover:bg-accent transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-semibold text-gray-900">{campaign.title}</div>
+                                            {campaign.subject && (
+                                                <div className="text-xs text-gray-500 mt-1">{campaign.subject}</div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-700">
+                                            {new Date(campaign.send_time).toLocaleDateString('en-GB', { 
+                                                day: 'numeric', 
+                                                month: 'short', 
+                                                year: 'numeric' 
+                                            })}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">
+                                            {campaign.emails_sent.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">
+                                            {campaign.opens.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-right">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                                                {campaign.open_rate}%
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">
+                                            {campaign.clicks.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-right">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                                                {campaign.click_rate}%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="p-8 text-center text-gray-500">
+                            <i className="fas fa-inbox text-4xl mb-3 text-gray-300"></i>
+                            <p>No email campaigns found</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+
+        // Events Table Component
+        const EventsTable = ({ events, loading }) => (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="p-6 border-b bg-secondary">
+                    <h2 className="text-xl font-bold text-white flex items-center">
+                        <i className="fas fa-calendar-alt mr-3"></i>
+                        Upcoming Events
+                        <InfoTooltip text="Shows upcoming recruitment events from Ticket Tailor. Displays event details, venues, and attendance numbers. Source: Ticket Tailor Events API." />
+                    </h2>
+                </div>
+                <div className="overflow-x-auto">
+                    {loading ? (
+                        <div className="p-6 animate-pulse space-y-4">
+                            {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-200 rounded"></div>)}
+                        </div>
+                    ) : events && events.length > 0 ? (
+                        <table className="w-full">
+                            <thead className="bg-accent">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Date</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Event Name</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Venue</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-secondary uppercase tracking-wider">Attending</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {events.map((event, index) => (
+                                    <tr key={index} className="hover:bg-accent transition-colors">
+                                        <td className="px-6 py-4 text-sm text-gray-700 font-medium">
+                                            {new Date(event.start).toLocaleDateString('en-GB', { 
+                                                weekday: 'short', 
+                                                day: 'numeric', 
+                                                month: 'short', 
+                                                year: 'numeric' 
+                                            })}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm font-semibold text-gray-900">{event.name}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-700">{event.venue || 'TBA'}</td>
+                                        <td className="px-6 py-4 text-sm text-right">
+                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-primary text-white">
+                                                {event.sold}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="p-8 text-center text-gray-500">
+                            <i className="fas fa-calendar-times text-4xl mb-3 text-gray-300"></i>
+                            <p>No upcoming events</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+
         // Links Table Component
-        const LinksTable = ({ links, loading, onViewDetails, dateRange, onDateRangeChange }) => {
-            return (
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
-                        <h3 className="text-lg font-bold text-gray-800">
-                            <i className="fas fa-link mr-2"></i>Student Recruitment Links
-                        </h3>
-                        <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg border-2 border-blue-200">
-                            <i className="fas fa-calendar-alt text-blue-600"></i>
-                            <span className="text-sm text-gray-700 font-medium">Date Range:</span>
+        const LinksTable = ({ links, loading, dateRange, onDateRangeChange, onViewDetails }) => (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="p-6 border-b bg-secondary">
+                    <div className="flex justify-between items-center flex-wrap gap-4">
+                        <h2 className="text-xl font-bold text-white flex items-center">
+                            <i className="fas fa-link mr-3"></i>
+                            Student Recruitment Links
+                            <InfoTooltip text="Shows Bitly short links used for recruitment marketing. Click counts are filtered by your selected date range. Source: Bitly Links API with time-based filtering." />
+                        </h2>
+                        <div className="flex items-center gap-3 bg-accent px-4 py-2 rounded-lg">
+                            <label className="text-sm font-semibold text-secondary">Date Range:</label>
                             <select
                                 value={dateRange}
-                                onChange={(e) => onDateRangeChange(parseInt(e.target.value))}
-                                className="border-0 bg-transparent font-bold text-gray-800 focus:outline-none cursor-pointer"
+                                onChange={(e) => onDateRangeChange(Number(e.target.value))}
+                                className="px-3 py-1.5 border-2 border-primary rounded-lg text-sm font-semibold text-secondary bg-white focus:outline-none focus:ring-2 focus:ring-primary"
                             >
                                 <option value={7}>Last 7 days</option>
                                 <option value={14}>Last 14 days</option>
@@ -405,129 +572,170 @@
                             </select>
                         </div>
                     </div>
+                </div>
+                <div className="overflow-x-auto">
                     {loading ? (
-                        <div className="animate-pulse space-y-3">
-                            {[1,2,3,4,5].map(i => (<div key={i} className="h-12 bg-gray-200 rounded"></div>))}
+                        <div className="p-6 animate-pulse space-y-4">
+                            {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-16 bg-gray-200 rounded"></div>)}
                         </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Short Link</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Destination</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Clicks</th>
-                                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Details</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {links && links.map((link, index) => (
-                                        <tr key={index} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3 text-sm text-blue-600">
-                                                <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                                    {link.id}
-                                                </a>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600 max-w-md truncate">
-                                                {link.title || link.longUrl}
-                                            </td>
-                                            <td className="px-4 py-3 text-xs">
-                                                {link.tags && link.tags.map((tag, i) => (
-                                                    <span key={i} className="inline-block bg-blue-100 text-blue-800 rounded-full px-2 py-1 mr-1 mb-1">
-                                                        {tag}
-                                                    </span>
-                                                ))}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
+                    ) : links && links.length > 0 ? (
+                        <table className="w-full">
+                            <thead className="bg-accent">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Short Link</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Title</th>
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-secondary uppercase tracking-wider">Clicks</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-secondary uppercase tracking-wider">Tags</th>
+                                    <th className="px-6 py-3 text-center text-xs font-bold text-secondary uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {links.map((link, index) => (
+                                    <tr key={index} className="hover:bg-accent transition-colors">
+                                        <td className="px-6 py-4 text-sm">
+                                            <a href={link.id} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-secondary font-medium hover:underline">
+                                                {link.id.replace('https://', '')}
+                                            </a>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                                            {link.title || 'Untitled'}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-right">
+                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-primary text-white">
                                                 {link.clicks.toLocaleString()}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <button
-                                                    onClick={() => onViewDetails(link)}
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold transition-colors"
-                                                >
-                                                    <i className="fas fa-chart-line mr-1"></i>
-                                                    View
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-700">
+                                            {link.tags && link.tags.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {link.tags.map((tag, i) => (
+                                                        <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <button
+                                                onClick={() => onViewDetails(link)}
+                                                className="bg-primary hover:bg-secondary text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                                            >
+                                                <i className="fas fa-chart-line mr-2"></i>View Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="p-8 text-center text-gray-500">
+                            <i className="fas fa-link text-4xl mb-3 text-gray-300"></i>
+                            <p>No links found</p>
                         </div>
                     )}
                 </div>
-            );
-        };
+            </div>
+        );
 
-        // Main Dashboard
+        // Main Dashboard Component
         const Dashboard = () => {
-            const [loading, setLoading] = useState(true);
-            const [error, setError] = useState(null);
-            const [dateRange, setDateRange] = useState(30);
-            const [showReferrerModal, setShowReferrerModal] = useState(false);
-            const [selectedLink, setSelectedLink] = useState(null);
+            const [loading, setLoading] = useState(false);
             const [leadStats, setLeadStats] = useState(null);
             const [bitlyData, setBitlyData] = useState(null);
             const [eventsData, setEventsData] = useState(null);
+            const [campaignData, setCampaignData] = useState(null);
+            const [dateRange, setDateRange] = useState(30);
             const [lastUpdated, setLastUpdated] = useState(null);
+            const [showReferrerModal, setShowReferrerModal] = useState(false);
+            const [selectedLink, setSelectedLink] = useState(null);
 
-            const fetchAllData = async (refetchBitly = true) => {
-                setLoading(true);
-                setError(null);
+            const fetchLeadStats = async () => {
                 try {
-                    const promises = [
-                        callAPI('mailchimp', { action: 'getLeadStats', weeks: 12 }),
-                        callAPI('ticket-tailor', { action: 'getEvents' })
-                    ];
-                    if (refetchBitly) {
-                        promises.push(callAPI('bitly', { action: 'getRecruitmentLinks', days: dateRange }));
-                    }
-                    const results = await Promise.allSettled(promises);
-                    if (results[0].status === 'fulfilled') setLeadStats(results[0].value);
-                    if (results[1].status === 'fulfilled') setEventsData(results[1].value);
-                    if (refetchBitly && results[2] && results[2].status === 'fulfilled') {
-                        setBitlyData(results[2].value);
-                    }
+                    const data = await callAPI('mailchimp', { action: 'getLeadStats' });
+                    setLeadStats(data);
+                } catch (error) {
+                    console.error('Error fetching lead stats:', error);
+                }
+            };
+
+            const fetchBitlyData = async (days = dateRange) => {
+                try {
+                    const data = await callAPI('bitly', { 
+                        action: 'getRecruitmentLinks',
+                        days: days
+                    });
+                    setBitlyData(data);
+                } catch (error) {
+                    console.error('Error fetching Bitly data:', error);
+                }
+            };
+
+            const fetchEventsData = async () => {
+                try {
+                    const data = await callAPI('tickettailor', { action: 'getEvents' });
+                    setEventsData(data);
+                } catch (error) {
+                    console.error('Error fetching events data:', error);
+                }
+            };
+
+            const fetchCampaignData = async () => {
+                try {
+                    const data = await callAPI('mailchimp', { action: 'getCampaigns' });
+                    setCampaignData(data);
+                } catch (error) {
+                    console.error('Error fetching campaign data:', error);
+                }
+            };
+
+            const fetchAllData = async (forceRefresh = false) => {
+                setLoading(true);
+                try {
+                    await Promise.all([
+                        fetchLeadStats(),
+                        fetchBitlyData(dateRange),
+                        fetchEventsData(),
+                        fetchCampaignData()
+                    ]);
                     setLastUpdated(new Date());
-                } catch (err) {
-                    setError('Failed to load dashboard data.');
-                    console.error(err);
+                } catch (error) {
+                    console.error('Error fetching data:', error);
                 } finally {
                     setLoading(false);
                 }
             };
 
             const refetchBitlyOnly = async () => {
+                setLoading(true);
                 try {
-                    const result = await callAPI('bitly', { action: 'getRecruitmentLinks', days: dateRange });
-                    setBitlyData(result);
-                    setLastUpdated(new Date());
-                } catch (err) {
-                    console.error('Bitly error:', err);
+                    await fetchBitlyData(dateRange);
+                } catch (error) {
+                    console.error('Error refetching Bitly data:', error);
+                } finally {
+                    setLoading(false);
                 }
             };
 
-            useEffect(() => { fetchAllData(); }, []);
+            useEffect(() => {
+                fetchAllData();
+            }, []);
 
             return (
                 <div className="min-h-screen p-6">
                     <div className="max-w-7xl mx-auto">
-                        <div className="mb-8">
-                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                            <div className="flex justify-between items-center flex-wrap gap-4">
                                 <div>
-                                    <h1 className="text-4xl font-bold text-gray-900">
-                                        <i className="fas fa-graduation-cap mr-3 text-blue-600"></i>
+                                    <h1 className="text-3xl font-bold text-secondary mb-2">
+                                        <i className="fas fa-graduation-cap mr-3"></i>
                                         Student Recruitment Dashboard
                                     </h1>
-                                    <p className="text-gray-600 mt-2">
-                                        Academic Year {new Date().getMonth() >= 8 ? new Date().getFullYear() : new Date().getFullYear() - 1}/{new Date().getMonth() >= 8 ? new Date().getFullYear() + 1 : new Date().getFullYear()}
-                                    </p>
+                                    <p className="text-gray-600">Academic Year 2024/25 • Recruitment Analytics</p>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex gap-3">
                                     <button
-                                        onClick={() => exportToCSV(bitlyData, eventsData, dateRange)}
+                                        onClick={() => exportToCSV(bitlyData, eventsData, campaignData, dateRange)}
                                         disabled={loading}
                                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 shadow-sm"
                                     >
@@ -536,14 +744,14 @@
                                     <button
                                         onClick={() => fetchAllData(true)}
                                         disabled={loading}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 shadow-sm"
+                                        className="bg-primary hover-secondary text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 shadow-sm"
                                     >
                                         <i className="fas fa-sync-alt mr-2"></i>Refresh All
                                     </button>
                                 </div>
                             </div>
                             {lastUpdated && (
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-gray-500 mt-3">
                                     <i className="fas fa-clock mr-1"></i>
                                     Last updated: {lastUpdated.toLocaleTimeString()}
                                 </p>
@@ -551,21 +759,77 @@
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                            <KPICard title="Total Leads" value={leadStats?.leads?.toLocaleString() || '0'} change={leadStats?.weeklyChange} icon="fas fa-users" color="bg-blue-600" loading={loading} subtitle={`${leadStats?.thisWeekSubscribed || 0} new this week`} />
-                            <KPICard title="Applicants" value={leadStats?.applicants?.toLocaleString() || '0'} change={null} icon="fas fa-user-graduate" color="bg-green-600" loading={loading} subtitle={`${leadStats?.conversionRate || 0}% conversion rate`} />
-                            <KPICard title={`Link Clicks (${dateRange}d)`} value={bitlyData?.totalClicks?.toLocaleString() || '0'} change={null} icon="fas fa-mouse-pointer" color="bg-purple-600" loading={loading} subtitle={`${bitlyData?.totalLinks || 0} active links`} />
-                            <KPICard title="Upcoming Events" value={eventsData?.upcomingEvents?.length || '0'} change={null} icon="fas fa-calendar-check" color="bg-orange-600" loading={loading} subtitle={`${eventsData?.summary?.totalSold || 0} people attending`} />
+                            <KPICard 
+                                title="Total Leads" 
+                                value={leadStats?.leads?.toLocaleString() || '0'} 
+                                change={leadStats?.weeklyChange} 
+                                icon="fas fa-users" 
+                                color="bg-primary" 
+                                loading={loading} 
+                                subtitle={`${leadStats?.thisWeekSubscribed || 0} new this week`}
+                                tooltip="Total subscribed members in Mailchimp student recruitment audience. Source: Mailchimp Members API."
+                            />
+                            <KPICard 
+                                title="Applicants" 
+                                value={leadStats?.applicants?.toLocaleString() || '0'} 
+                                change={null} 
+                                icon="fas fa-user-graduate" 
+                                color="bg-secondary" 
+                                loading={loading} 
+                                subtitle={`${leadStats?.conversionRate || 0}% conversion rate`}
+                                tooltip="Leads tagged as 'applicant' in Mailchimp, showing conversion from interest to application. Source: Mailchimp Tags API."
+                            />
+                            <KPICard 
+                                title={`Link Clicks (${dateRange}d)`} 
+                                value={bitlyData?.totalClicks?.toLocaleString() || '0'} 
+                                change={null} 
+                                icon="fas fa-mouse-pointer" 
+                                color="bg-primary" 
+                                loading={loading} 
+                                subtitle={`${bitlyData?.totalLinks || 0} active links`}
+                                tooltip={`Total clicks on Bitly links in the last ${dateRange} days. Date range affects this metric. Source: Bitly clicks/summary API with time filter.`}
+                            />
+                            <KPICard 
+                                title="Upcoming Events" 
+                                value={eventsData?.upcomingEvents?.length || '0'} 
+                                change={null} 
+                                icon="fas fa-calendar-check" 
+                                color="bg-secondary" 
+                                loading={loading} 
+                                subtitle={`${eventsData?.summary?.totalSold || 0} people attending`}
+                                tooltip="Future events scheduled in Ticket Tailor with total confirmed attendees. Source: Ticket Tailor Events & Orders API."
+                            />
+                        </div>
+
+                        <div className="mb-6">
+                            <CampaignsTable campaigns={campaignData?.campaigns} loading={loading} />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            <ChartComponent title="Lead Generation Trend (Weekly)" type="line" data={leadStats?.weeklyData?.map(w => w.net) || []} labels={leadStats?.weeklyData?.map(w => new Date(w.date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })) || []} loading={loading} />
-                            <ChartComponent title="Traffic Sources (Top Referrers)" type="bar" data={bitlyData?.topReferrers?.map(r => r.clicks) || []} labels={bitlyData?.topReferrers?.map(r => r.referrer) || []} loading={loading} />
+                            <ChartComponent 
+                                title="Lead Generation Trend (Weekly)" 
+                                type="line" 
+                                data={leadStats?.weeklyData?.map(w => w.net) || []} 
+                                labels={leadStats?.weeklyData?.map(w => new Date(w.date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })) || []} 
+                                loading={loading}
+                                tooltip="Shows net new leads per week (subscriptions minus unsubscriptions). Source: Mailchimp Member Activity API."
+                            />
+                            <ChartComponent 
+                                title="Traffic Sources (Top Referrers)" 
+                                type="bar" 
+                                data={bitlyData?.topReferrers?.map(r => r.clicks) || []} 
+                                labels={bitlyData?.topReferrers?.map(r => r.referrer) || []} 
+                                loading={loading}
+                                tooltip="Shows where link clicks originated from (social media, direct, etc.). This is all-time data. Source: Bitly referrers API."
+                            />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                             <div className="bg-white p-6 rounded-lg shadow-md">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                                    <i className="fas fa-globe mr-2"></i>Geographic Distribution
+                                <h3 className="text-lg font-bold text-secondary mb-4 flex items-center">
+                                    <i className="fas fa-globe mr-2"></i>
+                                    Geographic Distribution
+                                    <InfoTooltip text="Shows where link clicks came from by country. Based on all-time data as Bitly's countries endpoint doesn't support date filtering. Source: Bitly countries API." />
                                 </h3>
                                 {loading ? (
                                     <div className="animate-pulse space-y-3">
@@ -574,13 +838,13 @@
                                 ) : bitlyData?.topCountries && bitlyData.topCountries.length > 0 ? (
                                     <div className="space-y-3">
                                         {bitlyData.topCountries.map((country, index) => (
-                                            <div key={index} className="flex items-center justify-between p-3 rounded-lg hover:bg-blue-50 transition-all duration-200 cursor-default group">
-                                                <span className="font-semibold text-gray-800 group-hover:text-blue-700 transition-colors min-w-[120px]">
+                                            <div key={index} className="flex items-center justify-between p-3 rounded-lg hover:bg-accent transition-all duration-200 cursor-default group">
+                                                <span className="font-semibold text-secondary group-hover:text-primary transition-colors min-w-[120px]">
                                                     {getFullCountryName(country.country)}
                                                 </span>
                                                 <div className="flex items-center gap-4 flex-1 ml-4">
                                                     <div className="flex-1 max-w-md bg-gray-200 rounded-full h-3 overflow-hidden">
-                                                        <div className="bg-blue-600 h-3 rounded-full transition-all duration-500 group-hover:bg-blue-700" style={{ width: `${country.percentage}%` }}></div>
+                                                        <div className="bg-primary h-3 rounded-full transition-all duration-500 group-hover:bg-secondary" style={{ width: `${country.percentage}%` }}></div>
                                                     </div>
                                                     <span className="font-bold text-gray-900 w-14 text-right">{country.percentage}%</span>
                                                     <span className="text-gray-700 font-semibold w-16 text-right">{country.clicks.toLocaleString()}</span>
@@ -594,8 +858,10 @@
                             </div>
 
                             <div className="bg-white p-6 rounded-lg shadow-md">
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                                    <i className="fas fa-chart-pie mr-2"></i>Event Summary
+                                <h3 className="text-lg font-bold text-secondary mb-4 flex items-center">
+                                    <i className="fas fa-chart-pie mr-2"></i>
+                                    Event Summary
+                                    <InfoTooltip text="Summary of upcoming recruitment events and total attendees. Source: Ticket Tailor Events & Orders API." />
                                 </h3>
                                 {loading ? (
                                     <div className="animate-pulse space-y-4">
@@ -603,13 +869,13 @@
                                     </div>
                                 ) : eventsData?.summary ? (
                                     <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
-                                            <span className="text-gray-700 font-medium text-lg">Total Events</span>
-                                            <span className="text-3xl font-bold text-blue-600">{eventsData.summary.totalEvents}</span>
+                                        <div className="flex justify-between items-center p-4 bg-accent rounded-lg border-2 border-primary">
+                                            <span className="text-secondary font-medium text-lg">Total Events</span>
+                                            <span className="text-3xl font-bold text-primary">{eventsData.summary.totalEvents}</span>
                                         </div>
-                                        <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg">
-                                            <span className="text-gray-700 font-medium text-lg">People Attending</span>
-                                            <span className="text-3xl font-bold text-purple-600">{eventsData.summary.totalSold}</span>
+                                        <div className="flex justify-between items-center p-4 bg-accent rounded-lg border-2 border-secondary">
+                                            <span className="text-secondary font-medium text-lg">People Attending</span>
+                                            <span className="text-3xl font-bold text-secondary">{eventsData.summary.totalSold}</span>
                                         </div>
                                     </div>
                                 ) : (
@@ -639,9 +905,12 @@
                             />
                         </div>
 
-                        <div className="mt-8 text-center text-gray-500 text-sm border-t pt-6">
-                            <p>Student Recruitment Dashboard • Academic Year 2024/25</p>
+                        <div className="mt-8 text-center text-gray-600 text-sm border-t pt-6 bg-white rounded-lg shadow-md p-4">
+                            <p className="font-semibold text-secondary">Student Recruitment Dashboard • Academic Year 2024/25</p>
                             <p className="mt-1">Recruitment Period: October - August</p>
+                            <p className="mt-3 text-xs text-gray-500">
+                                Data sources: Bitly (link analytics), Mailchimp (email campaigns & leads), Ticket Tailor (events)
+                            </p>
                         </div>
                     </div>
 

@@ -1,180 +1,192 @@
-const axios = require('axios');
+const fetch = require('node-fetch');
+
+const MAILCHIMP_API_KEY = process.env.MAILCHIMP_API_KEY;
+const MAILCHIMP_SERVER = process.env.MAILCHIMP_SERVER;
+const AUDIENCE_ID = process.env.MAILCHIMP_AUDIENCE_ID;
+
+const headers = {
+    'Authorization': `Bearer ${MAILCHIMP_API_KEY}`,
+    'Content-Type': 'application/json'
+};
 
 exports.handler = async (event) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json'
-  };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  const apiKey = process.env.MAILCHIMP_API_KEY;
-  const serverPrefix = process.env.MAILCHIMP_SERVER_PREFIX || 'us1';
-  const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
-
-  if (!apiKey || !audienceId) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Mailchimp not configured' })
+    // CORS headers
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
     };
-  }
 
-  const baseUrl = `https://${serverPrefix}.api.mailchimp.com/3.0`;
-  const auth = Buffer.from(`anystring:${apiKey}`).toString('base64');
-
-  try {
-    const { action, weeks = 12 } = JSON.parse(event.body || '{}');
-
-    switch (action) {
-      case 'getLeadStats':
-        // Get current audience stats
-        const audienceRes = await axios.get(`${baseUrl}/lists/${audienceId}`, {
-          headers: { 'Authorization': `Basic ${auth}` }
-        });
-
-        // Get growth history for weekly trends
-        const growthRes = await axios.get(`${baseUrl}/lists/${audienceId}/growth-history`, {
-          headers: { 'Authorization': `Basic ${auth}` },
-          params: { count: weeks }
-        });
-
-        // Get member count by tag (leads vs applicants)
-        const membersRes = await axios.get(`${baseUrl}/lists/${audienceId}/members`, {
-          headers: { 'Authorization': `Basic ${auth}` },
-          params: { count: 1000, status: 'subscribed' }
-        });
-
-        // Count leads vs applicants
-        let totalLeads = 0;
-        let applicants = 0;
-        
-        membersRes.data.members.forEach(member => {
-          const tags = member.tags.map(t => t.name.toLowerCase());
-          if (tags.includes('applicant')) {
-            applicants++;
-          }
-          totalLeads++;
-        });
-
-        const leads = totalLeads - applicants;
-
-        // Calculate weekly percentage change
-        const growthHistory = growthRes.data.history.reverse();
-        const thisWeek = growthHistory[growthHistory.length - 1]?.subscribed || 0;
-        const lastWeek = growthHistory[growthHistory.length - 2]?.subscribed || 0;
-        const weeklyChange = lastWeek > 0 ? ((thisWeek - lastWeek) / lastWeek * 100).toFixed(2) : 0;
-
-        // Prepare weekly data for charts
-        const weeklyData = growthHistory.map(week => ({
-          date: week.month,
-          subscribed: week.subscribed,
-          unsubscribed: week.unsubscribed,
-          net: week.subscribed - week.unsubscribed
-        }));
-
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            totalMembers: audienceRes.data.stats.member_count,
-            leads,
-            applicants,
-            conversionRate: totalLeads > 0 ? ((applicants / totalLeads) * 100).toFixed(2) : 0,
-            weeklyChange: parseFloat(weeklyChange),
-            thisWeekSubscribed: thisWeek,
-            lastWeekSubscribed: lastWeek,
-            weeklyData,
-            lastUpdated: new Date().toISOString()
-          })
-        };
-
-      case 'getCampaignPerformance':
-        // Get recent campaigns
-        const campaignsRes = await axios.get(`${baseUrl}/campaigns`, {
-          headers: { 'Authorization': `Basic ${auth}` },
-          params: {
-            count: 10,
-            status: 'sent',
-            sort_field: 'send_time',
-            sort_dir: 'DESC'
-          }
-        });
-
-        // Get reports for each campaign
-        const reportPromises = campaignsRes.data.campaigns.map(campaign =>
-          axios.get(`${baseUrl}/reports/${campaign.id}`, {
-            headers: { 'Authorization': `Basic ${auth}` }
-          }).catch(() => null)
-        );
-
-        const reports = await Promise.all(reportPromises);
-
-        const campaignData = reports
-          .filter(r => r)
-          .map(r => ({
-            title: r.data.campaign_title,
-            sent: r.data.emails_sent,
-            opens: r.data.opens.opens_total,
-            clicks: r.data.clicks.clicks_total,
-            openRate: (r.data.opens.open_rate * 100).toFixed(2),
-            clickRate: (r.data.clicks.click_rate * 100).toFixed(2),
-            sendTime: r.data.send_time
-          }));
-
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ campaigns: campaignData })
-        };
-
-      case 'getLeadSources':
-        // Get members with their source tags
-        const sourceMembersRes = await axios.get(`${baseUrl}/lists/${audienceId}/members`, {
-          headers: { 'Authorization': `Basic ${auth}` },
-          params: { count: 1000 }
-        });
-
-        const sources = {};
-        sourceMembersRes.data.members.forEach(member => {
-          member.tags.forEach(tag => {
-            const tagName = tag.name;
-            if (!tagName.toLowerCase().includes('applicant')) {
-              sources[tagName] = (sources[tagName] || 0) + 1;
-            }
-          });
-        });
-
-        const sourceData = Object.entries(sources)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 10)
-          .map(([source, count]) => ({ source, count }));
-
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ sources: sourceData })
-        };
-
-      default:
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ error: 'Invalid action' })
-        };
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers: corsHeaders, body: '' };
     }
 
-  } catch (error) {
-    console.error('Mailchimp API Error:', error.response?.data || error.message);
-    return {
-      statusCode: error.response?.status || 500,
-      headers,
-      body: JSON.stringify({
-        error: error.response?.data?.detail || error.message || 'Failed to fetch Mailchimp data'
-      })
-    };
-  }
+    try {
+        const { action } = JSON.parse(event.body);
+
+        if (action === 'getLeadStats') {
+            return await getLeadStats(corsHeaders);
+        } else if (action === 'getCampaigns') {
+            return await getCampaigns(corsHeaders);
+        } else {
+            return {
+                statusCode: 400,
+                headers: corsHeaders,
+                body: JSON.stringify({ error: 'Invalid action' })
+            };
+        }
+    } catch (error) {
+        console.error('Error in Mailchimp function:', error);
+        return {
+            statusCode: 500,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
 };
+
+async function getLeadStats(corsHeaders) {
+    try {
+        // Get total member count
+        const membersUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}`;
+        const membersResponse = await fetch(membersUrl, { headers });
+        const membersData = await membersResponse.json();
+        
+        if (!membersResponse.ok) {
+            throw new Error(membersData.detail || 'Failed to fetch members');
+        }
+
+        const totalLeads = membersData.stats.member_count;
+
+        // Get applicants count (members tagged with 'applicant')
+        const applicantsUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}/members?count=1000&status=subscribed`;
+        const applicantsResponse = await fetch(applicantsUrl, { headers });
+        const applicantsData = await applicantsResponse.json();
+        
+        if (!applicantsResponse.ok) {
+            throw new Error(applicantsData.detail || 'Failed to fetch applicants');
+        }
+
+        const applicants = applicantsData.members.filter(member => 
+            member.tags && member.tags.some(tag => tag.name.toLowerCase() === 'applicant')
+        ).length;
+
+        const conversionRate = totalLeads > 0 ? ((applicants / totalLeads) * 100).toFixed(1) : 0;
+
+        // Get weekly activity for the past 12 weeks
+        const weeklyData = [];
+        const now = new Date();
+        
+        for (let i = 11; i >= 0; i--) {
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - (i * 7 + 7));
+            const weekEnd = new Date(now);
+            weekEnd.setDate(now.getDate() - (i * 7));
+            
+            const activityUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}/growth-history`;
+            const activityResponse = await fetch(activityUrl, { headers });
+            const activityData = await activityResponse.json();
+            
+            if (activityResponse.ok && activityData.history) {
+                const weekHistory = activityData.history.find(h => {
+                    const historyDate = new Date(h.month);
+                    return historyDate >= weekStart && historyDate <= weekEnd;
+                });
+                
+                if (weekHistory) {
+                    weeklyData.push({
+                        date: weekStart.toISOString(),
+                        subscribed: weekHistory.subscribed || 0,
+                        unsubscribed: weekHistory.unsubscribed || 0,
+                        net: (weekHistory.subscribed || 0) - (weekHistory.unsubscribed || 0)
+                    });
+                } else {
+                    weeklyData.push({
+                        date: weekStart.toISOString(),
+                        subscribed: 0,
+                        unsubscribed: 0,
+                        net: 0
+                    });
+                }
+            }
+        }
+
+        // Calculate this week's subscriptions
+        const thisWeekSubscribed = weeklyData.length > 0 ? weeklyData[weeklyData.length - 1].subscribed : 0;
+
+        // Calculate weekly change percentage
+        const lastWeekNet = weeklyData.length >= 2 ? weeklyData[weeklyData.length - 2].net : 0;
+        const thisWeekNet = weeklyData.length > 0 ? weeklyData[weeklyData.length - 1].net : 0;
+        const weeklyChange = lastWeekNet !== 0 
+            ? (((thisWeekNet - lastWeekNet) / Math.abs(lastWeekNet)) * 100).toFixed(1)
+            : 0;
+
+        return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({
+                leads: totalLeads,
+                applicants: applicants,
+                conversionRate: parseFloat(conversionRate),
+                thisWeekSubscribed: thisWeekSubscribed,
+                weeklyChange: parseFloat(weeklyChange),
+                weeklyData: weeklyData
+            })
+        };
+    } catch (error) {
+        console.error('Error fetching lead stats:', error);
+        throw error;
+    }
+}
+
+async function getCampaigns(corsHeaders) {
+    try {
+        // Get campaigns sent to the student recruitment audience
+        // We'll fetch the last 20 sent campaigns
+        const campaignsUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/campaigns?count=100&status=sent&list_id=${AUDIENCE_ID}&sort_field=send_time&sort_dir=DESC`;
+        
+        const campaignsResponse = await fetch(campaignsUrl, { headers });
+        const campaignsData = await campaignsResponse.json();
+        
+        if (!campaignsResponse.ok) {
+            throw new Error(campaignsData.detail || 'Failed to fetch campaigns');
+        }
+
+        // Process campaigns to extract key metrics
+        const campaigns = campaignsData.campaigns
+            .filter(campaign => campaign.status === 'sent' && campaign.send_time)
+            .slice(0, 20) // Limit to most recent 20
+            .map(campaign => {
+                const report = campaign.report_summary || {};
+                const emails_sent = report.emails_sent || 0;
+                const opens = report.opens || 0;
+                const clicks = report.clicks || 0;
+                
+                return {
+                    id: campaign.id,
+                    title: campaign.settings?.title || 'Untitled Campaign',
+                    subject: campaign.settings?.subject_line || '',
+                    send_time: campaign.send_time,
+                    emails_sent: emails_sent,
+                    opens: opens,
+                    open_rate: emails_sent > 0 ? ((opens / emails_sent) * 100).toFixed(1) : '0.0',
+                    clicks: clicks,
+                    click_rate: emails_sent > 0 ? ((clicks / emails_sent) * 100).toFixed(1) : '0.0',
+                    unique_opens: report.unique_opens || 0,
+                    unique_clicks: report.subscriber_clicks || 0
+                };
+            });
+
+        return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: JSON.stringify({
+                campaigns: campaigns,
+                total: campaigns.length
+            })
+        };
+    } catch (error) {
+        console.error('Error fetching campaigns:', error);
+        throw error;
+    }
+}
