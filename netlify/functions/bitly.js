@@ -70,22 +70,46 @@ exports.handler = async (event) => {
             case 'getRecruitmentLinks':
                 // Get all groups
                 const groupsResult = await bitlyFetch('/groups');
-                
+
                 if (!groupsResult.ok) {
                     throw new Error('Failed to fetch groups');
                 }
 
                 const groupId = groupsResult.data.groups[0].guid;
 
-                // Get all bitlinks
-                const linksResult = await bitlyFetch(`/groups/${groupId}/bitlinks`, { size: 100 });
-                
-                if (!linksResult.ok) {
-                    throw new Error('Failed to fetch links');
+                // Fetch ALL bitlinks using pagination
+                let allLinks = [];
+                let searchAfter = null;
+                let hasMorePages = true;
+
+                while (hasMorePages) {
+                    const params = { size: 100 };
+                    if (searchAfter) {
+                        params.search_after = searchAfter;
+                    }
+
+                    const linksResult = await bitlyFetch(`/groups/${groupId}/bitlinks`, params);
+
+                    if (!linksResult.ok) {
+                        throw new Error('Failed to fetch links');
+                    }
+
+                    const links = linksResult.data.links || [];
+                    allLinks = allLinks.concat(links);
+
+                    // Check if there are more pages
+                    if (linksResult.data.pagination?.next && links.length === 100) {
+                        searchAfter = linksResult.data.pagination.search_after;
+                        hasMorePages = !!searchAfter;
+                    } else {
+                        hasMorePages = false;
+                    }
+
+                    console.log(`Fetched ${links.length} links (total: ${allLinks.length})`);
                 }
 
                 // Filter for student-recruitment tagged links
-                const recruitmentLinks = linksResult.data.links.filter(link => 
+                const recruitmentLinks = allLinks.filter(link =>
                     link.tags?.some(tag => tag.toLowerCase().includes('student') || tag.toLowerCase().includes('recruitment'))
                 );
 
@@ -244,21 +268,43 @@ exports.handler = async (event) => {
             case 'getLinkTrends':
                 // Get groups
                 const groupsTrendResult = await bitlyFetch('/groups');
-                
+
                 if (!groupsTrendResult.ok) {
                     throw new Error('Failed to fetch groups');
                 }
 
                 const groupIdTrend = groupsTrendResult.data.groups[0].guid;
 
-                // Get bitlinks
-                const linksTrendResult = await bitlyFetch(`/groups/${groupIdTrend}/bitlinks`, { size: 100 });
-                
-                if (!linksTrendResult.ok) {
-                    throw new Error('Failed to fetch links');
+                // Fetch ALL bitlinks using pagination
+                let allLinksTrend = [];
+                let searchAfterTrend = null;
+                let hasMorePagesTrend = true;
+
+                while (hasMorePagesTrend) {
+                    const paramsTrend = { size: 100 };
+                    if (searchAfterTrend) {
+                        paramsTrend.search_after = searchAfterTrend;
+                    }
+
+                    const linksTrendResult = await bitlyFetch(`/groups/${groupIdTrend}/bitlinks`, paramsTrend);
+
+                    if (!linksTrendResult.ok) {
+                        throw new Error('Failed to fetch links');
+                    }
+
+                    const linksTrend = linksTrendResult.data.links || [];
+                    allLinksTrend = allLinksTrend.concat(linksTrend);
+
+                    // Check if there are more pages
+                    if (linksTrendResult.data.pagination?.next && linksTrend.length === 100) {
+                        searchAfterTrend = linksTrendResult.data.pagination.search_after;
+                        hasMorePagesTrend = !!searchAfterTrend;
+                    } else {
+                        hasMorePagesTrend = false;
+                    }
                 }
 
-                const recruitmentLinksTrend = linksTrendResult.data.links.filter(link => 
+                const recruitmentLinksTrend = allLinksTrend.filter(link =>
                     link.tags?.some(tag => tag.toLowerCase().includes('student') || tag.toLowerCase().includes('recruitment'))
                 );
 
