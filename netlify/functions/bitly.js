@@ -84,10 +84,25 @@ exports.handler = async (event) => {
                     throw new Error('Failed to fetch links');
                 }
 
-                // Filter for student-recruitment tagged links (exact match or contains)
-                const recruitmentLinks = linksResult.data.links.filter(link => 
-                    link.tags?.some(tag => tag.toLowerCase().includes('student-recruitment'))
-                );
+                // Log all tags to help debug
+                const allTags = new Set();
+                linksResult.data.links.forEach(link => {
+                    if (link.tags) {
+                        link.tags.forEach(tag => allTags.add(tag));
+                    }
+                });
+                console.log(`All tags found in Bitly:`, Array.from(allTags).join(', '));
+                
+                // Filter for student-recruitment tagged links (flexible matching)
+                // Matches: "student-recruitment", "student recruitment", "studentrecruitment", etc.
+                const recruitmentLinks = linksResult.data.links.filter(link => {
+                    if (!link.tags || link.tags.length === 0) return false;
+                    
+                    return link.tags.some(tag => {
+                        const normalizedTag = tag.toLowerCase().replace(/[\s-_]/g, '');
+                        return normalizedTag.includes('student') && normalizedTag.includes('recruitment');
+                    });
+                });
 
                 console.log(`Found ${recruitmentLinks.length} recruitment links out of ${linksResult.data.links.length} total links`);
 

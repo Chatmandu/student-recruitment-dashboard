@@ -199,8 +199,7 @@ async function getLeadStats(corsHeaders) {
 async function getCampaigns(corsHeaders) {
     try {
         // Get campaigns sent to the student recruitment audience
-        // We'll fetch the last 100 sent campaigns and filter to 20
-        const campaignsUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/campaigns?count=100&status=sent&list_id=${AUDIENCE_ID}&sort_field=send_time&sort_dir=DESC`;
+        const campaignsUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/campaigns?count=50&status=sent&list_id=${AUDIENCE_ID}&sort_field=send_time&sort_dir=DESC`;
         
         const campaignsResult = await mailchimpFetch(campaignsUrl);
         
@@ -209,16 +208,38 @@ async function getCampaigns(corsHeaders) {
         }
 
         const campaignsData = campaignsResult.data;
-
-        // Process campaigns to extract key metrics
-        const campaigns = campaignsData.campaigns
+        
+        // Get the most recent 20 campaigns
+        const recentCampaigns = campaignsData.campaigns
             .filter(campaign => campaign.status === 'sent' && campaign.send_time)
-            .slice(0, 20) // Limit to most recent 20
-            .map(campaign => {
-                const report = campaign.report_summary || {};
+            .slice(0, 20);
+
+        // Fetch full report data for each campaign (this has the actual metrics)
+        const reportPromises = recentCampaigns.map(campaign => {
+            const reportUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/reports/${campaign.id}`;
+            return mailchimpFetch(reportUrl)
+                .then(res => {
+                    if (res.ok) {
+                        return { campaign, report: res.data };
+                    }
+                    console.error(`Failed to fetch report for campaign ${campaign.id}`);
+                    return { campaign, report: null };
+                })
+                .catch(err => {
+                    console.error(`Error fetching report for campaign ${campaign.id}:`, err.message);
+                    return { campaign, report: null };
+                });
+        });
+
+        const campaignsWithReports = await Promise.all(reportPromises);
+
+        // Process campaigns with full report data
+        const campaigns = campaignsWithReports.map(({ campaign, report }) => {
+            if (report) {
+                // Use the full report data which has accurate metrics
                 const emails_sent = report.emails_sent || 0;
-                const opens = report.opens || 0;
-                const clicks = report.clicks || 0;
+                const opens = report.opens?.unique_opens || 0;
+                const clicks = report.clicks?.unique_clicks || 0;
                 
                 return {
                     id: campaign.id,
@@ -229,11 +250,28 @@ async function getCampaigns(corsHeaders) {
                     opens: opens,
                     open_rate: emails_sent > 0 ? parseFloat(((opens / emails_sent) * 100).toFixed(1)) : 0,
                     clicks: clicks,
-                    click_rate: emails_sent > 0 ? parseFloat(((clicks / emails_sent) * 100).toFixed(1)) : 0,
-                    unique_opens: report.unique_opens || 0,
-                    unique_clicks: report.subscriber_clicks || 0
+                    click_rate: emails_sent > 0 ? parseFloat(((clicks / emails_sent) * 100).toFixed(1)) : 0
                 };
-            });
+            } else {
+                // Fallback to summary data if report fetch failed
+                const summary = campaign.report_summary || {};
+                const emails_sent = summary.emails_sent || 0;
+                const opens = summary.unique_opens || 0;
+                const clicks = summary.subscriber_clicks || 0;
+                
+                return {
+                    id: campaign.id,
+                    title: campaign.settings?.title || 'Untitled Campaign',
+                    subject: campaign.settings?.subject_line || '',
+                    send_time: campaign.send_time,
+                    emails_sent: emails_sent,
+                    opens: opens,
+                    open_rate: emails_sent > 0 ? parseFloat(((opens / emails_sent) * 100).toFixed(1)) : 0,
+                    clicks: clicks,
+                    click_rate: emails_sent > 0 ? parseFloat(((clicks / emails_sent) * 100).toFixed(1)) : 0
+                };
+            }
+        });
 
         return {
             statusCode: 200,

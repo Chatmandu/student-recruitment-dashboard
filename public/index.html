@@ -827,7 +827,7 @@
                                 data={bitlyData?.topReferrers?.map(r => r.clicks) || []} 
                                 labels={bitlyData?.topReferrers?.map(r => r.referrer) || []} 
                                 loading={loading}
-                                tooltip="Shows where link clicks originated from (social media, direct, etc.). This is all-time data. Source: Bitly referrers API."
+                                tooltip="Shows where link clicks originated from (social media, direct, etc.). NOTE: This is all-time data and does NOT change with date range selection, as Bitly's referrers API doesn't support date filtering. Source: Bitly referrers API."
                             />
                         </div>
 
