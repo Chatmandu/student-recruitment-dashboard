@@ -77,14 +77,15 @@ exports.handler = async (event) => {
 
                 const groupId = groupsResult.data.groups[0].guid;
 
-                // Get ALL bitlinks with pagination (fetch up to 50 pages / 5000 links)
+                // Get ALL bitlinks with pagination and deduplication
+                const seenIds = new Set();
                 let allLinks = [];
-                let hasMore = true;
                 let page = 1;
+                const maxPages = 20;
                 
                 console.log('Starting to fetch Bitly links...');
                 
-                while (hasMore && page <= 50) { // Increased to 50 pages (5000 links max)
+                while (page <= maxPages) {
                     const linksResult = await bitlyFetch(`/groups/${groupId}/bitlinks`, { 
                         size: 100,
                         page: page
@@ -96,22 +97,35 @@ exports.handler = async (event) => {
                     }
                     
                     const links = linksResult.data.links || [];
-                    allLinks = allLinks.concat(links);
                     
-                    if (page % 5 === 0) { // Log every 5 pages to reduce noise
-                        console.log(`Fetched ${page} pages so far: ${allLinks.length} total links`);
+                    // Check for duplicates - if we see same links, stop
+                    let newLinksCount = 0;
+                    for (const link of links) {
+                        if (!seenIds.has(link.id)) {
+                            seenIds.add(link.id);
+                            allLinks.push(link);
+                            newLinksCount++;
+                        }
                     }
                     
-                    // Check if there are more pages
+                    console.log(`Page ${page}: ${newLinksCount} new links (${links.length - newLinksCount} duplicates)`);
+                    
+                    // Stop if we got no new links (all were duplicates)
+                    if (newLinksCount === 0) {
+                        console.log(`Stopping - all links on page ${page} were duplicates`);
+                        break;
+                    }
+                    
+                    // Stop if we got fewer than 100 links (last page)
                     if (links.length < 100) {
-                        hasMore = false;
                         console.log(`Reached last page (${page}) with ${links.length} links`);
-                    } else {
-                        page++;
+                        break;
                     }
+                    
+                    page++;
                 }
                 
-                console.log(`Total links fetched: ${allLinks.length} across ${page} pages`);
+                console.log(`Total UNIQUE links fetched: ${allLinks.length}`);
                 
                 // Check for specific missing links
                 const missingLinks = ['lstm.ac/PhD', 'lstm.ac/study'];
@@ -140,30 +154,19 @@ exports.handler = async (event) => {
                 });
                 
                 // Filter for student-recruitment tagged links (flexible matching)
-                // Matches: "student-recruitment", "student recruitment", "studentrecruitment", etc.
                 const recruitmentLinks = allLinks.filter(link => {
-                    if (!link.tags || link.tags.length === 0) {
-                        return false;
-                    }
+                    if (!link.tags || link.tags.length === 0) return false;
                     
-                    const hasRecruitmentTag = link.tags.some(tag => {
+                    return link.tags.some(tag => {
                         const normalizedTag = tag.toLowerCase().replace(/[\s-_]/g, '');
-                        const matches = normalizedTag.includes('student') && normalizedTag.includes('recruitment');
-                        
-                        if (matches) {
-                            console.log(`  ✓ Matched: ${link.id} (tag: "${tag}")`);
-                        }
-                        
-                        return matches;
+                        return normalizedTag.includes('student') && normalizedTag.includes('recruitment');
                     });
-                    
-                    return hasRecruitmentTag;
                 });
 
-                console.log(`Found ${recruitmentLinks.length} recruitment links out of ${allLinks.length} total links`);
+                console.log(`Found ${recruitmentLinks.length} unique recruitment links`);
                 
-                // Log all recruitment link IDs
-                console.log('All recruitment links:', recruitmentLinks.map(l => l.id).join(', '));
+                // Log all unique recruitment link IDs
+                console.log('Recruitment links:', recruitmentLinks.map(l => l.id).join(', '));
 
                 // Get click data for each recruitment link
                 const clickPromises = recruitmentLinks.map(link => {
@@ -195,10 +198,6 @@ exports.handler = async (event) => {
                                 } else if (Array.isArray(res.data)) {
                                     metrics = res.data;
                                 }
-                                
-                                const referrerCount = metrics.length;
-                                const totalClicks = metrics.reduce((sum, ref) => sum + (ref.clicks || ref.value || 0), 0);
-                                console.log(`Referrers for ${link.id}: ${referrerCount} sources, ${totalClicks} clicks`);
                             }
                             
                             return { data: { metrics: metrics } };
@@ -209,6 +208,7 @@ exports.handler = async (event) => {
                 });
 
                 const referrersData = await Promise.all(referrerPromises);
+                console.log(`Fetched referrer data for ${recruitmentLinks.length} links`);
 
                 // Get country data for each link
                 const countryPromises = recruitmentLinks.map(link => {
@@ -227,7 +227,6 @@ exports.handler = async (event) => {
                 // Combine all data with properly formatted structure for the modal
                 const enrichedLinks = recruitmentLinks.map((link, i) => {
                     const clicks = clicksData[i]?.data?.total_clicks || 0;
-                    console.log(`${link.id}: ${clicks} clicks`);
                     
                     // Get referrer data and calculate total clicks from all referrers
                     const rawReferrers = referrersData[i]?.data?.metrics || [];
