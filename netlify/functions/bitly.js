@@ -77,34 +77,77 @@ exports.handler = async (event) => {
 
                 const groupId = groupsResult.data.groups[0].guid;
 
-                // Get all bitlinks
-                const linksResult = await bitlyFetch(`/groups/${groupId}/bitlinks`, { size: 100 });
+                // Get ALL bitlinks with pagination (not just first 100)
+                let allLinks = [];
+                let hasMore = true;
+                let page = 1;
                 
-                if (!linksResult.ok) {
-                    throw new Error('Failed to fetch links');
+                while (hasMore && page <= 10) { // Limit to 10 pages (1000 links) to avoid timeout
+                    const linksResult = await bitlyFetch(`/groups/${groupId}/bitlinks`, { 
+                        size: 100,
+                        page: page
+                    });
+                    
+                    if (!linksResult.ok) {
+                        console.error(`Failed to fetch links page ${page}`);
+                        break;
+                    }
+                    
+                    const links = linksResult.data.links || [];
+                    allLinks = allLinks.concat(links);
+                    
+                    console.log(`Fetched page ${page}: ${links.length} links`);
+                    
+                    // Check if there are more pages
+                    if (links.length < 100) {
+                        hasMore = false;
+                    } else {
+                        page++;
+                    }
                 }
-
+                
+                console.log(`Total links fetched: ${allLinks.length}`);
+                
                 // Log all tags to help debug
                 const allTags = new Set();
-                linksResult.data.links.forEach(link => {
+                allLinks.forEach(link => {
                     if (link.tags) {
                         link.tags.forEach(tag => allTags.add(tag));
                     }
                 });
                 console.log(`All tags found in Bitly:`, Array.from(allTags).join(', '));
                 
+                // Log first 10 links with their tags for debugging
+                console.log('Sample of all links:');
+                allLinks.slice(0, 10).forEach(link => {
+                    console.log(`  ${link.id} - tags: [${link.tags?.join(', ') || 'none'}]`);
+                });
+                
                 // Filter for student-recruitment tagged links (flexible matching)
                 // Matches: "student-recruitment", "student recruitment", "studentrecruitment", etc.
-                const recruitmentLinks = linksResult.data.links.filter(link => {
-                    if (!link.tags || link.tags.length === 0) return false;
+                const recruitmentLinks = allLinks.filter(link => {
+                    if (!link.tags || link.tags.length === 0) {
+                        return false;
+                    }
                     
-                    return link.tags.some(tag => {
+                    const hasRecruitmentTag = link.tags.some(tag => {
                         const normalizedTag = tag.toLowerCase().replace(/[\s-_]/g, '');
-                        return normalizedTag.includes('student') && normalizedTag.includes('recruitment');
+                        const matches = normalizedTag.includes('student') && normalizedTag.includes('recruitment');
+                        
+                        if (matches) {
+                            console.log(`  ✓ Matched: ${link.id} (tag: "${tag}")`);
+                        }
+                        
+                        return matches;
                     });
+                    
+                    return hasRecruitmentTag;
                 });
 
-                console.log(`Found ${recruitmentLinks.length} recruitment links out of ${linksResult.data.links.length} total links`);
+                console.log(`Found ${recruitmentLinks.length} recruitment links out of ${allLinks.length} total links`);
+                
+                // Log all recruitment link IDs
+                console.log('All recruitment links:', recruitmentLinks.map(l => l.id).join(', '));
 
                 // Get click data for each recruitment link
                 const clickPromises = recruitmentLinks.map(link => {
