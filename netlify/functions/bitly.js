@@ -77,12 +77,14 @@ exports.handler = async (event) => {
 
                 const groupId = groupsResult.data.groups[0].guid;
 
-                // Get ALL bitlinks with pagination (not just first 100)
+                // Get ALL bitlinks with pagination (fetch up to 50 pages / 5000 links)
                 let allLinks = [];
                 let hasMore = true;
                 let page = 1;
                 
-                while (hasMore && page <= 10) { // Limit to 10 pages (1000 links) to avoid timeout
+                console.log('Starting to fetch Bitly links...');
+                
+                while (hasMore && page <= 50) { // Increased to 50 pages (5000 links max)
                     const linksResult = await bitlyFetch(`/groups/${groupId}/bitlinks`, { 
                         size: 100,
                         page: page
@@ -96,17 +98,31 @@ exports.handler = async (event) => {
                     const links = linksResult.data.links || [];
                     allLinks = allLinks.concat(links);
                     
-                    console.log(`Fetched page ${page}: ${links.length} links`);
+                    if (page % 5 === 0) { // Log every 5 pages to reduce noise
+                        console.log(`Fetched ${page} pages so far: ${allLinks.length} total links`);
+                    }
                     
                     // Check if there are more pages
                     if (links.length < 100) {
                         hasMore = false;
+                        console.log(`Reached last page (${page}) with ${links.length} links`);
                     } else {
                         page++;
                     }
                 }
                 
-                console.log(`Total links fetched: ${allLinks.length}`);
+                console.log(`Total links fetched: ${allLinks.length} across ${page} pages`);
+                
+                // Check for specific missing links
+                const missingLinks = ['lstm.ac/PhD', 'lstm.ac/study'];
+                missingLinks.forEach(linkId => {
+                    const found = allLinks.find(l => l.id.includes(linkId.split('/')[1]));
+                    if (found) {
+                        console.log(`✓ Found ${linkId}: tags = [${found.tags?.join(', ') || 'none'}]`);
+                    } else {
+                        console.log(`✗ Missing ${linkId} - not in fetched links`);
+                    }
+                });
                 
                 // Log all tags to help debug
                 const allTags = new Set();
