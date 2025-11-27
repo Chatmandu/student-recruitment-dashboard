@@ -84,7 +84,15 @@ exports.handler = async (event) => {
 
                 let events = eventsResult.data.data || [];
                 
-                console.log(`Fetched ${events.length} events from Ticket Tailor`);
+                // Filter to only include future events (start date is today or later)
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                events = events.filter(evt => {
+                    const eventStart = new Date(evt.start?.date || evt.start);
+                    return eventStart >= now;
+                });
+                
+                console.log(`Fetched ${events.length} future events from Ticket Tailor`);
                 
                 // Fetch ticket data for each event via ORDERS
                 // To avoid timeout, we'll limit processing and use simpler logic

@@ -100,31 +100,49 @@ async function getLeadStats(corsHeaders) {
 
         const conversionRate = totalLeads > 0 ? ((applicants / totalLeads) * 100).toFixed(1) : 0;
 
-        // Get weekly activity for the past 12 weeks
+        // Get member activity for proper weekly tracking
+        // Note: Mailchimp growth-history is MONTHLY, so we'll fetch member activity instead
+        const activityUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}/growth-history`;
+        const activityResult = await mailchimpFetch(activityUrl);
+        
         const weeklyData = [];
         const now = new Date();
         
-        for (let i = 11; i >= 0; i--) {
-            const weekStart = new Date(now);
-            weekStart.setDate(now.getDate() - (i * 7 + 7));
-            const weekEnd = new Date(now);
-            weekEnd.setDate(now.getDate() - (i * 7));
+        if (activityResult.ok && activityResult.data.history) {
+            // Mailchimp returns monthly data, so we'll aggregate by weeks
+            // Get last 12 weeks of data by processing monthly history
+            const history = activityResult.data.history;
             
-            const activityUrl = `https://${MAILCHIMP_SERVER}.api.mailchimp.com/3.0/lists/${AUDIENCE_ID}/growth-history`;
-            const activityResult = await mailchimpFetch(activityUrl);
-            
-            if (activityResult.ok && activityResult.data.history) {
-                const weekHistory = activityResult.data.history.find(h => {
-                    const historyDate = new Date(h.month);
-                    return historyDate >= weekStart && historyDate <= weekEnd;
+            for (let i = 11; i >= 0; i--) {
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - (i * 7 + 7));
+                weekStart.setHours(0, 0, 0, 0);
+                
+                const weekEnd = new Date(now);
+                weekEnd.setDate(now.getDate() - (i * 7));
+                weekEnd.setHours(23, 59, 59, 999);
+                
+                // Find the monthly record that contains this week
+                const monthRecord = history.find(h => {
+                    const recordDate = new Date(h.month);
+                    const recordMonth = recordDate.getMonth();
+                    const recordYear = recordDate.getFullYear();
+                    const weekMonth = weekStart.getMonth();
+                    const weekYear = weekStart.getFullYear();
+                    
+                    return recordMonth === weekMonth && recordYear === weekYear;
                 });
                 
-                if (weekHistory) {
+                if (monthRecord) {
+                    // Approximate weekly values from monthly totals (divide by ~4)
+                    const weeklySubscribed = Math.round((monthRecord.subscribed || 0) / 4);
+                    const weeklyUnsubscribed = Math.round((monthRecord.unsubscribed || 0) / 4);
+                    
                     weeklyData.push({
                         date: weekStart.toISOString(),
-                        subscribed: weekHistory.subscribed || 0,
-                        unsubscribed: weekHistory.unsubscribed || 0,
-                        net: (weekHistory.subscribed || 0) - (weekHistory.unsubscribed || 0)
+                        subscribed: weeklySubscribed,
+                        unsubscribed: weeklyUnsubscribed,
+                        net: weeklySubscribed - weeklyUnsubscribed
                     });
                 } else {
                     weeklyData.push({
@@ -134,6 +152,19 @@ async function getLeadStats(corsHeaders) {
                         net: 0
                     });
                 }
+            }
+        } else {
+            // Fallback: create empty weekly data
+            for (let i = 11; i >= 0; i--) {
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - (i * 7 + 7));
+                
+                weeklyData.push({
+                    date: weekStart.toISOString(),
+                    subscribed: 0,
+                    unsubscribed: 0,
+                    net: 0
+                });
             }
         }
 
@@ -196,9 +227,9 @@ async function getCampaigns(corsHeaders) {
                     send_time: campaign.send_time,
                     emails_sent: emails_sent,
                     opens: opens,
-                    open_rate: emails_sent > 0 ? ((opens / emails_sent) * 100).toFixed(1) : '0.0',
+                    open_rate: emails_sent > 0 ? parseFloat(((opens / emails_sent) * 100).toFixed(1)) : 0,
                     clicks: clicks,
-                    click_rate: emails_sent > 0 ? ((clicks / emails_sent) * 100).toFixed(1) : '0.0',
+                    click_rate: emails_sent > 0 ? parseFloat(((clicks / emails_sent) * 100).toFixed(1)) : 0,
                     unique_opens: report.unique_opens || 0,
                     unique_clicks: report.subscriber_clicks || 0
                 };

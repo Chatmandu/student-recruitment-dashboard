@@ -84,12 +84,12 @@ exports.handler = async (event) => {
                     throw new Error('Failed to fetch links');
                 }
 
-                // Filter for student-recruitment tagged links
+                // Filter for student-recruitment tagged links (exact match or contains)
                 const recruitmentLinks = linksResult.data.links.filter(link => 
-                    link.tags?.some(tag => tag.toLowerCase().includes('student') || tag.toLowerCase().includes('recruitment'))
+                    link.tags?.some(tag => tag.toLowerCase().includes('student-recruitment'))
                 );
 
-                console.log(`Found ${recruitmentLinks.length} recruitment links`);
+                console.log(`Found ${recruitmentLinks.length} recruitment links out of ${linksResult.data.links.length} total links`);
 
                 // Get click data for each recruitment link
                 const clickPromises = recruitmentLinks.map(link => {
