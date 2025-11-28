@@ -239,11 +239,24 @@ async function getCampaigns(corsHeaders) {
                 // Use the full report data which has accurate metrics
                 const emails_sent = report.emails_sent || 0;
                 const opens = report.opens?.unique_opens || 0;
-                const clicks = report.clicks?.unique_clicks || 0;
                 
-                // Debug logging to see what's in the clicks object
-                if (campaign.id) {
-                    console.log(`Campaign ${campaign.settings?.title}: clicks object =`, JSON.stringify(report.clicks));
+                // Try multiple possible field names for clicks
+                let clicks = 0;
+                
+                // Debug: log the entire clicks object to see structure
+                if (report.clicks) {
+                    console.log(`Campaign "${campaign.settings?.title}" clicks object:`, JSON.stringify(report.clicks, null, 2));
+                    
+                    // Try different possible field names
+                    clicks = report.clicks.unique_clicks 
+                          || report.clicks.unique_subscriber_clicks 
+                          || report.clicks.total_clicks
+                          || report.clicks.clicks
+                          || 0;
+                    
+                    console.log(`  Extracted clicks value: ${clicks}`);
+                } else {
+                    console.log(`Campaign "${campaign.settings?.title}" has no clicks object`);
                 }
                 
                 return {
