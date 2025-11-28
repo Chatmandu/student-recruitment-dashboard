@@ -127,16 +127,41 @@ exports.handler = async (event) => {
                 
                 console.log(`Total UNIQUE links fetched: ${allLinks.length}`);
                 
-                // Check for specific missing links
-                const missingLinks = ['lstm.ac/PhD', 'lstm.ac/study'];
-                missingLinks.forEach(linkId => {
-                    const found = allLinks.find(l => l.id.includes(linkId.split('/')[1]));
-                    if (found) {
-                        console.log(`✓ Found ${linkId}: tags = [${found.tags?.join(', ') || 'none'}]`);
-                    } else {
-                        console.log(`✗ Missing ${linkId} - not in fetched links`);
+                // Try to fetch specific missing links directly
+                const specificLinks = ['lstm.ac/PhD', 'lstm.ac/study'];
+                console.log('Attempting to fetch specific links directly...');
+                
+                for (const linkId of specificLinks) {
+                    try {
+                        const encodedId = encodeURIComponent(linkId);
+                        const result = await bitlyFetch(`/bitlinks/${encodedId}`);
+                        
+                        if (result.ok && result.data) {
+                            const link = result.data;
+                            console.log(`✓ Found ${linkId} directly: tags = [${link.tags?.join(', ') || 'none'}]`);
+                            
+                            // Add to allLinks if not already present and has student-recruitment tag
+                            if (!seenIds.has(link.id)) {
+                                const hasRecruitmentTag = link.tags?.some(tag => {
+                                    const normalizedTag = tag.toLowerCase().replace(/[\s-_]/g, '');
+                                    return normalizedTag.includes('student') && normalizedTag.includes('recruitment');
+                                });
+                                
+                                if (hasRecruitmentTag) {
+                                    seenIds.add(link.id);
+                                    allLinks.push(link);
+                                    console.log(`  Added ${linkId} to links (has recruitment tag)`);
+                                } else {
+                                    console.log(`  ${linkId} exists but missing recruitment tag`);
+                                }
+                            }
+                        } else {
+                            console.log(`✗ ${linkId} not found in Bitly`);
+                        }
+                    } catch (err) {
+                        console.log(`✗ Error fetching ${linkId}: ${err.message}`);
                     }
-                });
+                }
                 
                 // Log all tags to help debug
                 const allTags = new Set();

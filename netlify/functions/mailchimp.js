@@ -241,6 +241,11 @@ async function getCampaigns(corsHeaders) {
                 const opens = report.opens?.unique_opens || 0;
                 const clicks = report.clicks?.unique_clicks || 0;
                 
+                // Debug logging to see what's in the clicks object
+                if (campaign.id) {
+                    console.log(`Campaign ${campaign.settings?.title}: clicks object =`, JSON.stringify(report.clicks));
+                }
+                
                 return {
                     id: campaign.id,
                     title: campaign.settings?.title || 'Untitled Campaign',
